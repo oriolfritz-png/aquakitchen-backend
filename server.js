@@ -61,6 +61,7 @@ async function analyzeWithGoogleVision(imageBase64) {
         body: JSON.stringify(requestBody)
     });
     const data = await response.json();
+   console.log('Vision API response:',JSON.stringify(data.responses[0].labelAnnotations, null, 2));
     if (!data.responses || !data.responses[0].labelAnnotations) return [];
     const foodKeywords = [
         'food', 'vegetable', 'fruit', 'meat', 'dairy', 'chicken', 'beef', 'pork', 'fish',
