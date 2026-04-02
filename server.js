@@ -41,8 +41,7 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
-// ========== STRICT FOOD-ONLY FILTER ==========
-// Comprehensive list of edible foods, seasonings, and ingredients
+// ========== STRICT FOOD-ONLY FILTER WITH LOGGING ==========
 const EDIBLE_FOODS = new Set([
     // Fruits
     'apple', 'banana', 'orange', 'lemon', 'lime', 'grape', 'strawberry', 'blueberry', 'raspberry', 'blackberry',
@@ -62,25 +61,26 @@ const EDIBLE_FOODS = new Set([
     'cheddar', 'mozzarella', 'swiss', 'ricotta', 'feta', 'goat cheese', 'almond milk', 'soy milk', 'oat milk',
     // Grains & Starches
     'rice', 'pasta', 'noodle', 'bread', 'bagel', 'croissant', 'tortilla', 'cereal', 'oat', 'quinoa', 'barley',
-    'farro', 'couscous', 'flour', 'cornmeal', 'polenta', 'noodle', 'spaghetti', 'macaroni', 'lasagna',
+    'farro', 'couscous', 'flour', 'cornmeal', 'polenta', 'spaghetti', 'macaroni', 'lasagna',
     // Legumes & Nuts
     'bean', 'lentil', 'chickpea', 'pea', 'soybean', 'nut', 'almond', 'walnut', 'pecan', 'cashew', 'peanut',
     'sunflower seed', 'pumpkin seed', 'sesame seed', 'flaxseed', 'chia seed',
-    // Spices, Herbs & Seasonings
+    // Spices & Herbs
     'salt', 'pepper', 'paprika', 'cumin', 'coriander', 'turmeric', 'ginger', 'garlic powder', 'onion powder',
     'oregano', 'basil', 'thyme', 'rosemary', 'sage', 'parsley', 'cilantro', 'dill', 'mint', 'cinnamon',
     'nutmeg', 'clove', 'cardamom', 'vanilla', 'cocoa', 'chocolate', 'bay leaf', 'red pepper flakes', 'cayenne',
     'chili powder', 'curry powder', 'garam masala', 'five spice', 'herbes de provence',
-    // Canned & Packaged Foods (by ingredient name)
+    // Canned & Packaged
     'soup', 'broth', 'stock', 'sauce', 'ketchup', 'mustard', 'mayonnaise', 'vinegar', 'oil', 'olive oil',
     'coconut oil', 'vegetable oil', 'honey', 'maple syrup', 'jam', 'jelly', 'peanut butter', 'nutella',
-    // Frozen foods (specific items)
+    // Frozen
     'frozen peas', 'frozen corn', 'frozen broccoli', 'frozen spinach', 'french fry', 'ice cream', 'pizza',
-    // Drinks (edible liquid ingredients)
+    // Drinks
     'coffee', 'tea', 'juice', 'soda', 'water', 'beer', 'wine', 'milk', 'cream', 'coconut water'
 ]);
 
 async function analyzeWithGoogleVision(imageBase64) {
+    console.log('analyzeWithGoogleVision called with image length:', imageBase64 ? imageBase64.length : 'no image');
     const apiKey = process.env.GOOGLE_VISION_API_KEY;
     const base64Image = imageBase64.split(',')[1];
     const requestBody = {
@@ -96,35 +96,45 @@ async function analyzeWithGoogleVision(imageBase64) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody)
         });
+        console.log('Vision API response status:', response.status);
         const data = await response.json();
-        if (!data.responses || !data.responses[0].labelAnnotations) return [];
-
+        console.log('Vision API data (full):', JSON.stringify(data, null, 2));
+        if (!data.responses || !data.responses[0].labelAnnotations) {
+            console.log('No label annotations found.');
+            return [];
+        }
         const allLabels = data.responses[0].labelAnnotations.map(label => label.description.toLowerCase());
+        console.log('All labels from Vision:', allLabels);
         const ingredients = new Set();
         for (const label of allLabels) {
-            // Direct match
             if (EDIBLE_FOODS.has(label)) {
                 ingredients.add(label);
+                console.log(`Direct match: ${label}`);
                 continue;
             }
-            // Check if label contains a known food (e.g., "chicken breast" contains "chicken")
+            let matched = false;
             for (const food of EDIBLE_FOODS) {
                 if (label.includes(food)) {
-                    ingredients.add(food); // add the base food, not the whole label
+                    ingredients.add(food);
+                    console.log(`Partial match: "${label}" -> "${food}"`);
+                    matched = true;
                     break;
                 }
             }
+            if (!matched) {
+                console.log(`Ignored: ${label}`);
+            }
         }
-        // Additional: if the image is of a fridge and no foods found, try to suggest common fridge items?
-        // But we will not add false positives.
-        return [...ingredients];
+        const result = [...ingredients];
+        console.log('Final ingredients:', result);
+        return result;
     } catch (error) {
-        console.error('Vision API error:', error);
+        console.error('Vision API fetch error details:', error);
         return [];
     }
 }
 
-// ========== RECIPE DATABASE (unchanged) ==========
+// ========== RECIPE DATABASE ==========
 const recipeDatabase = [
     { name: "🍗 Herb Roasted Chicken", calories: 425, prep: 45, protein: 38, required: ["chicken", "olive oil", "garlic", "onion"], optional: ["carrot", "potato", "rosemary", "thyme"], instructions: ["Preheat oven to 425°F", "Season chicken with salt, pepper, herbs", "Toss vegetables with oil and garlic", "Roast 20-25 min until chicken reaches 165°F", "Rest 5 min before serving"], image: "https://www.themealdb.com/images/media/meals/wyrqqq1468233628.jpg", isComplete: true },
     { name: "🍤 Garlic Lemon Shrimp", calories: 380, prep: 25, protein: 32, required: ["shrimp", "garlic", "olive oil", "lemon"], optional: ["parsley", "rice", "butter"], instructions: ["Pat shrimp dry, season with salt", "Heat oil in skillet", "Sauté shrimp 1-2 min per side, remove", "Add garlic, cook 30 sec", "Add lemon juice and zest, return shrimp", "Garnish with parsley, serve over rice"], image: "https://www.themealdb.com/images/media/meals/uxpqot1511553767.jpg", isComplete: true },
@@ -211,11 +221,14 @@ app.post('/api/update-tier', async (req, res) => {
 
 // ========== IMAGE ANALYSIS ENDPOINT ==========
 app.post('/api/analyze-images', async (req, res) => {
+    console.log('Received request to /api/analyze-images');
     try {
         const { images } = req.body;
+        console.log('Received images zones:', Object.keys(images));
         const results = {};
         for (const [zone, imageBase64] of Object.entries(images)) {
             if (imageBase64) {
+                console.log(`Processing zone: ${zone}, image length: ${imageBase64.length}`);
                 results[zone] = await analyzeWithGoogleVision(imageBase64);
             } else {
                 results[zone] = [];
