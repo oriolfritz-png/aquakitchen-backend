@@ -41,7 +41,45 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
-// ========== ENHANCED GOOGLE VISION - ONLY FOOD ITEMS ==========
+// ========== STRICT FOOD-ONLY FILTER ==========
+// Comprehensive list of edible foods, seasonings, and ingredients
+const EDIBLE_FOODS = new Set([
+    // Fruits
+    'apple', 'banana', 'orange', 'lemon', 'lime', 'grape', 'strawberry', 'blueberry', 'raspberry', 'blackberry',
+    'cherry', 'peach', 'pear', 'plum', 'watermelon', 'cantaloupe', 'honeydew', 'mango', 'papaya', 'kiwi',
+    'pineapple', 'coconut', 'avocado', 'tomato', 'olive', 'fig', 'date', 'pomegranate', 'cranberry',
+    // Vegetables
+    'carrot', 'broccoli', 'cauliflower', 'cabbage', 'lettuce', 'spinach', 'kale', 'arugula', 'celery',
+    'cucumber', 'zucchini', 'eggplant', 'bell pepper', 'jalapeno', 'onion', 'garlic', 'shallot', 'leek',
+    'potato', 'sweet potato', 'yam', 'radish', 'beet', 'turnip', 'parsnip', 'corn', 'pea', 'green bean',
+    'asparagus', 'artichoke', 'mushroom', 'okra', 'rhubarb', 'squash', 'pumpkin',
+    // Meats & Seafood
+    'chicken', 'beef', 'pork', 'lamb', 'veal', 'turkey', 'duck', 'fish', 'salmon', 'tuna', 'shrimp', 'crab',
+    'lobster', 'scallop', 'clam', 'oyster', 'mussel', 'tofu', 'tempeh', 'seitan', 'egg', 'bacon', 'sausage',
+    'ham', 'steak', 'ground beef', 'ground turkey', 'chicken breast', 'chicken thigh', 'pork chop',
+    // Dairy
+    'milk', 'cheese', 'yogurt', 'butter', 'cream', 'sour cream', 'cream cheese', 'cottage cheese', 'parmesan',
+    'cheddar', 'mozzarella', 'swiss', 'ricotta', 'feta', 'goat cheese', 'almond milk', 'soy milk', 'oat milk',
+    // Grains & Starches
+    'rice', 'pasta', 'noodle', 'bread', 'bagel', 'croissant', 'tortilla', 'cereal', 'oat', 'quinoa', 'barley',
+    'farro', 'couscous', 'flour', 'cornmeal', 'polenta', 'noodle', 'spaghetti', 'macaroni', 'lasagna',
+    // Legumes & Nuts
+    'bean', 'lentil', 'chickpea', 'pea', 'soybean', 'nut', 'almond', 'walnut', 'pecan', 'cashew', 'peanut',
+    'sunflower seed', 'pumpkin seed', 'sesame seed', 'flaxseed', 'chia seed',
+    // Spices, Herbs & Seasonings
+    'salt', 'pepper', 'paprika', 'cumin', 'coriander', 'turmeric', 'ginger', 'garlic powder', 'onion powder',
+    'oregano', 'basil', 'thyme', 'rosemary', 'sage', 'parsley', 'cilantro', 'dill', 'mint', 'cinnamon',
+    'nutmeg', 'clove', 'cardamom', 'vanilla', 'cocoa', 'chocolate', 'bay leaf', 'red pepper flakes', 'cayenne',
+    'chili powder', 'curry powder', 'garam masala', 'five spice', 'herbes de provence',
+    // Canned & Packaged Foods (by ingredient name)
+    'soup', 'broth', 'stock', 'sauce', 'ketchup', 'mustard', 'mayonnaise', 'vinegar', 'oil', 'olive oil',
+    'coconut oil', 'vegetable oil', 'honey', 'maple syrup', 'jam', 'jelly', 'peanut butter', 'nutella',
+    // Frozen foods (specific items)
+    'frozen peas', 'frozen corn', 'frozen broccoli', 'frozen spinach', 'french fry', 'ice cream', 'pizza',
+    // Drinks (edible liquid ingredients)
+    'coffee', 'tea', 'juice', 'soda', 'water', 'beer', 'wine', 'milk', 'cream', 'coconut water'
+]);
+
 async function analyzeWithGoogleVision(imageBase64) {
     const apiKey = process.env.GOOGLE_VISION_API_KEY;
     const base64Image = imageBase64.split(',')[1];
@@ -61,69 +99,32 @@ async function analyzeWithGoogleVision(imageBase64) {
         const data = await response.json();
         if (!data.responses || !data.responses[0].labelAnnotations) return [];
 
-        // Comprehensive list of edible food items
-        const foodItems = new Set([
-            // Fruits
-            'apple', 'banana', 'orange', 'lemon', 'lime', 'grape', 'strawberry', 'blueberry', 'raspberry', 'blackberry', 'cherry', 'peach', 'pear', 'plum', 'watermelon', 'cantaloupe', 'honeydew', 'mango', 'papaya', 'kiwi', 'pineapple', 'coconut', 'avocado', 'tomato', 'olive',
-            // Vegetables
-            'carrot', 'broccoli', 'cauliflower', 'cabbage', 'lettuce', 'spinach', 'kale', 'arugula', 'celery', 'cucumber', 'zucchini', 'eggplant', 'pepper', 'bell pepper', 'chili pepper', 'jalapeno', 'onion', 'garlic', 'shallot', 'leek', 'potato', 'sweet potato', 'yam', 'radish', 'beet', 'turnip', 'parsnip', 'corn', 'pea', 'green bean', 'asparagus', 'artichoke', 'mushroom',
-            // Meats & Proteins
-            'chicken', 'beef', 'pork', 'lamb', 'veal', 'turkey', 'duck', 'fish', 'salmon', 'tuna', 'shrimp', 'crab', 'lobster', 'scallop', 'tofu', 'tempeh', 'seitan', 'egg', 'bacon', 'sausage', 'ham', 'steak', 'ground beef', 'ground turkey',
-            // Dairy & Alternatives
-            'milk', 'cheese', 'yogurt', 'butter', 'cream', 'sour cream', 'cream cheese', 'cottage cheese', 'parmesan', 'cheddar', 'mozzarella', 'swiss', 'almond milk', 'soy milk', 'oat milk',
-            // Grains & Starches
-            'rice', 'pasta', 'noodle', 'bread', 'bagel', 'croissant', 'tortilla', 'cereal', 'oat', 'quinoa', 'barley', 'farro', 'couscous', 'flour',
-            // Legumes & Nuts
-            'bean', 'lentil', 'chickpea', 'pea', 'soybean', 'nut', 'almond', 'walnut', 'pecan', 'cashew', 'peanut', 'sunflower seed',
-            // Spices & Herbs
-            'salt', 'pepper', 'paprika', 'cumin', 'coriander', 'turmeric', 'ginger', 'garlic powder', 'onion powder', 'oregano', 'basil', 'thyme', 'rosemary', 'sage', 'parsley', 'cilantro', 'dill', 'mint', 'cinnamon', 'nutmeg', 'clove', 'cardamom', 'vanilla', 'cocoa', 'chocolate',
-            // Canned & Packaged
-            'soup', 'broth', 'stock', 'sauce', 'ketchup', 'mustard', 'mayonnaise', 'vinegar', 'oil', 'olive oil', 'coconut oil', 'vegetable oil',
-            // Frozen foods
-            'frozen', 'ice cream', 'pizza', 'french fry', 'waffle', 'pancake'
-        ]);
-
-        // Words to explicitly exclude
-        const excludeWords = new Set([
-            'appliance', 'kitchen', 'home', 'room', 'furniture', 'counter', 'table', 'refrigerator', 'freezer', 'pantry', 'cabinet', 'shelf', 'drawer', 'door', 'handle', 'light', 'cooking', 'baking', 'roasting', 'frying', 'grilling', 'steaming', 'boiling', 'container', 'package', 'packaging', 'wrapper', 'bag', 'box', 'can', 'jar', 'bottle', 'label', 'brand', 'logo', 'design', 'pattern', 'color', 'yellow', 'red', 'green', 'blue', 'white', 'black', 'brown', 'purple', 'orange', 'pink', 'gray', 'beige', 'wood', 'metal', 'plastic', 'glass', 'ceramic', 'stainless', 'electric', 'digital', 'modern', 'traditional', 'rustic', 'industrial', 'commercial', 'household', 'domestic', 'indoor', 'outdoor', 'backyard', 'garden', 'farm', 'market', 'store', 'grocery', 'supermarket', 'delivery', 'order', 'meal', 'dinner', 'lunch', 'breakfast', 'snack', 'dessert', 'appetizer', 'side dish', 'main course', 'entree', 'salad', 'sandwich', 'wrap', 'burger', 'taco', 'burrito', 'cookie', 'cake', 'pie', 'pastry', 'donut', 'muffin', 'toast', 'oatmeal', 'smoothie', 'juice', 'soda', 'water', 'coffee', 'tea', 'alcohol', 'beer', 'wine', 'spirit', 'liquor', 'cocktail', 'mocktail', 'dip', 'spread', 'jam', 'jelly', 'honey', 'syrup', 'condiment', 'seasoning', 'sugar', 'flour', 'gravy', 'marinade', 'brine', 'pickle', 'relish', 'chutney', 'salsa', 'guacamole', 'hummus', 'pesto', 'aioli', 'tartar', 'cocktail sauce', 'barbecue', 'teriyaki', 'soy sauce', 'worcestershire', 'fish sauce', 'oyster sauce', 'hoisin', 'sriracha', 'hot sauce', 'tabasco', 'chili', 'curry', 'masala', 'tandoori', 'cajun', 'creole'
-        ]);
-
         const allLabels = data.responses[0].labelAnnotations.map(label => label.description.toLowerCase());
-        const ingredients = [];
+        const ingredients = new Set();
         for (const label of allLabels) {
-            // Direct match with food item
-            if (foodItems.has(label)) {
-                ingredients.push(label);
+            // Direct match
+            if (EDIBLE_FOODS.has(label)) {
+                ingredients.add(label);
                 continue;
             }
-            // Check if label contains a food item (e.g., "chicken breast" contains "chicken")
-            let matched = false;
-            for (const food of foodItems) {
+            // Check if label contains a known food (e.g., "chicken breast" contains "chicken")
+            for (const food of EDIBLE_FOODS) {
                 if (label.includes(food)) {
-                    ingredients.push(label);
-                    matched = true;
+                    ingredients.add(food); // add the base food, not the whole label
                     break;
                 }
             }
-            if (matched) continue;
-            // Skip excluded words
-            if (excludeWords.has(label)) continue;
-            // Skip very short labels
-            if (label.length < 3) continue;
-            // Last resort: include if it has "food" but not "appliance"
-            if (label.includes('food') && !label.includes('appliance')) {
-                ingredients.push(label);
-            }
         }
-        // Remove duplicates and return all
-        return [...new Set(ingredients)];
+        // Additional: if the image is of a fridge and no foods found, try to suggest common fridge items?
+        // But we will not add false positives.
+        return [...ingredients];
     } catch (error) {
-        console.error('Vision API fetch error:', error);
+        console.error('Vision API error:', error);
         return [];
     }
 }
 
-// ========== RECIPE DATABASE ==========
+// ========== RECIPE DATABASE (unchanged) ==========
 const recipeDatabase = [
     { name: "🍗 Herb Roasted Chicken", calories: 425, prep: 45, protein: 38, required: ["chicken", "olive oil", "garlic", "onion"], optional: ["carrot", "potato", "rosemary", "thyme"], instructions: ["Preheat oven to 425°F", "Season chicken with salt, pepper, herbs", "Toss vegetables with oil and garlic", "Roast 20-25 min until chicken reaches 165°F", "Rest 5 min before serving"], image: "https://www.themealdb.com/images/media/meals/wyrqqq1468233628.jpg", isComplete: true },
     { name: "🍤 Garlic Lemon Shrimp", calories: 380, prep: 25, protein: 32, required: ["shrimp", "garlic", "olive oil", "lemon"], optional: ["parsley", "rice", "butter"], instructions: ["Pat shrimp dry, season with salt", "Heat oil in skillet", "Sauté shrimp 1-2 min per side, remove", "Add garlic, cook 30 sec", "Add lemon juice and zest, return shrimp", "Garnish with parsley, serve over rice"], image: "https://www.themealdb.com/images/media/meals/uxpqot1511553767.jpg", isComplete: true },
@@ -234,7 +235,6 @@ app.post('/api/search-recipes', async (req, res) => {
         if (!ingredients || ingredients.length === 0) {
             return res.json({ recipes: [] });
         }
-        // Try Spoonacular if API key available
         const spoonacularKey = process.env.SPOONACULAR_API_KEY;
         if (spoonacularKey && spoonacularKey !== 'MONEY') {
             try {
@@ -262,7 +262,6 @@ app.post('/api/search-recipes', async (req, res) => {
                 console.error('Spoonacular error:', spoonError);
             }
         }
-        // Fallback to local database
         const matchedRecipes = findMatchingRecipes(ingredients, mode);
         res.json({ recipes: matchedRecipes });
     } catch (error) {
