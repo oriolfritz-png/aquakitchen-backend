@@ -24,11 +24,8 @@ mongoose.connect(process.env.MONGODB_URI, {
   .catch(err => console.error('MongoDB error:', err));
 
 const UserSchema = new mongoose.Schema({
-    firstName: { type: String, required: true },
-    lastName: { type: String, required: true },
-    email: { type: String, unique: true, required: true },
-    password: { type: String, required: true },
-    emailVerified: { type: Boolean, default: true },
+    firstName: String, lastName: String, email: { type: String, unique: true },
+    password: String, emailVerified: { type: Boolean, default: true },
     subscriptionTier: { type: String, default: 'free' },
     optInPromotions: { type: Boolean, default: true },
     foodHabits: [{
@@ -36,8 +33,7 @@ const UserSchema = new mongoose.Schema({
         timestamp: Date,
         goal: String
     }],
-    createdAt: { type: Date, default: Date.now },
-    lastActive: Date
+    createdAt: Date, lastActive: Date
 });
 const User = mongoose.model('User', UserSchema);
 
@@ -70,13 +66,15 @@ const EDIBLE_FOODS = new Set([
 ]);
 
 async function analyzeWithGoogleVision(imageBase64) {
-    console.log('analyzeWithGoogleVision called, image length:', imageBase64 ? imageBase64.length : 0);
     const apiKey = process.env.GOOGLE_VISION_API_KEY;
     const base64Image = imageBase64.split(',')[1];
     const requestBody = {
         requests: [{
             image: { content: base64Image },
-            features: [{ type: 'LABEL_DETECTION', maxResults: 30 }]
+            features: [
+                { type: 'LABEL_DETECTION', maxResults: 30 },
+                { type: 'TEXT_DETECTION', maxResults: 20 } // reads text on packages
+            ]
         }]
     };
     const url = `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`;
@@ -86,34 +84,41 @@ async function analyzeWithGoogleVision(imageBase64) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody)
         });
-        console.log('Vision API response status:', response.status);
         const data = await response.json();
-        if (!data.responses || !data.responses[0].labelAnnotations) {
-            console.log('No label annotations found.');
-            return [];
-        }
-        const allLabels = data.responses[0].labelAnnotations.map(label => label.description.toLowerCase());
-        console.log('All labels:', allLabels);
         const ingredients = new Set();
-        for (const label of allLabels) {
-            if (EDIBLE_FOODS.has(label)) {
-                ingredients.add(label);
-                console.log(`Matched: ${label}`);
-            } else {
-                let matched = false;
-                for (const food of EDIBLE_FOODS) {
-                    if (label.includes(food)) {
-                        ingredients.add(food);
-                        console.log(`Partial match: "${label}" -> "${food}"`);
-                        matched = true;
-                        break;
+
+        // Process label annotations
+        if (data.responses && data.responses[0].labelAnnotations) {
+            const labels = data.responses[0].labelAnnotations.map(l => l.description.toLowerCase());
+            for (const label of labels) {
+                if (EDIBLE_FOODS.has(label)) ingredients.add(label);
+                else {
+                    for (const food of EDIBLE_FOODS) {
+                        if (label.includes(food)) {
+                            ingredients.add(food);
+                            break;
+                        }
                     }
                 }
-                if (!matched) console.log(`Ignored: ${label}`);
             }
         }
+
+        // Process text annotations (read words from labels/packages)
+        if (data.responses && data.responses[0].fullTextAnnotation) {
+            const text = data.responses[0].fullTextAnnotation.text.toLowerCase();
+            const words = text.split(/\s+/);
+            for (const word of words) {
+                if (EDIBLE_FOODS.has(word)) ingredients.add(word);
+                for (const food of EDIBLE_FOODS) {
+                    if (word.includes(food) && food.length > 2) {
+                        ingredients.add(food);
+                    }
+                }
+            }
+        }
+
         const result = [...ingredients];
-        console.log('Final ingredients:', result);
+        console.log('Detected ingredients:', result);
         return result;
     } catch (error) {
         console.error('Vision API error:', error);
@@ -121,7 +126,7 @@ async function analyzeWithGoogleVision(imageBase64) {
     }
 }
 
-// ========== RECIPE DATABASE ==========
+// ========== RECIPE DATABASE (unchanged) ==========
 const recipeDatabase = [
     { name: "🍗 Herb Roasted Chicken", calories: 425, prep: 45, protein: 38, required: ["chicken", "olive oil", "garlic", "onion"], optional: ["carrot", "potato", "rosemary", "thyme"], instructions: ["Preheat oven to 425°F", "Season chicken", "Roast 20-25 min"], image: "https://www.themealdb.com/images/media/meals/wyrqqq1468233628.jpg", isComplete: true },
     { name: "🍤 Garlic Lemon Shrimp", calories: 380, prep: 25, protein: 32, required: ["shrimp", "garlic", "olive oil", "lemon"], optional: ["parsley", "rice", "butter"], instructions: ["Sauté shrimp", "Add garlic and lemon"], image: "https://www.themealdb.com/images/media/meals/uxpqot1511553767.jpg", isComplete: true },
@@ -167,11 +172,12 @@ app.post('/api/register', async (req, res) => {
         const user = new User({
             firstName, lastName, email, password: hashed,
             emailVerified: true,
-            optInPromotions: optInPromotions !== false
+            optInPromotions: optInPromotions !== false,
+            createdAt: new Date()
         });
         await user.save();
         const token = jwt.sign({ userId: user._id, email: user.email, tier: user.subscriptionTier }, process.env.JWT_SECRET, { expiresIn: '7d' });
-        res.json({ success: true, token, user: { id: user._id, firstName: user.firstName, lastName: user.lastName, email: user.email, subscriptionTier: user.subscriptionTier } });
+        res.json({ success: true, token, user: { id: user._id, firstName, lastName, email, subscriptionTier: user.subscriptionTier } });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -211,12 +217,14 @@ app.post('/api/analyze-images', async (req, res) => {
     console.log('Received request to /api/analyze-images');
     try {
         const { images } = req.body;
-        console.log('Received images zones:', Object.keys(images));
         const results = {};
         for (const [zone, imageBase64] of Object.entries(images)) {
             if (imageBase64) {
-                console.log(`Processing zone: ${zone}, image length: ${imageBase64.length}`);
-                results[zone] = await analyzeWithGoogleVision(imageBase64);
+                const ingredients = await analyzeWithGoogleVision(imageBase64);
+                results[zone] = ingredients;
+                if (ingredients.length === 0) {
+                    results[`${zone}_note`] = "No specific food items detected. Try taking a closer photo of individual items or use the 'Add Missing Ingredient' button below.";
+                }
             } else {
                 results[zone] = [];
             }
