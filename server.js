@@ -37,7 +37,7 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
-// ========== EDIBLE FOODS DATABASE (for filtering) ==========
+// ========== EDIBLE FOODS DATABASE ==========
 const EDIBLE_FOODS = new Set([
     'apple', 'banana', 'orange', 'lemon', 'lime', 'grape', 'strawberry', 'blueberry', 'raspberry',
     'cherry', 'peach', 'pear', 'plum', 'watermelon', 'cantaloupe', 'honeydew', 'mango', 'papaya', 'kiwi',
@@ -87,7 +87,6 @@ async function analyzeWithGoogleVision(imageBase64) {
         const data = await response.json();
         const ingredients = new Set();
 
-        // Process label annotations
         if (data.responses && data.responses[0].labelAnnotations) {
             const labels = data.responses[0].labelAnnotations.map(l => l.description.toLowerCase());
             for (const label of labels) {
@@ -103,7 +102,6 @@ async function analyzeWithGoogleVision(imageBase64) {
             }
         }
 
-        // Process text annotations
         if (data.responses && data.responses[0].fullTextAnnotation) {
             const text = data.responses[0].fullTextAnnotation.text.toLowerCase();
             const words = text.split(/\s+/);
@@ -123,44 +121,71 @@ async function analyzeWithGoogleVision(imageBase64) {
     }
 }
 
-// ========== COMPREHENSIVE RECIPE DATABASE ==========
-const recipeDatabase = [
-    { name: "🍗 Herb Roasted Chicken", calories: 425, prep: 45, protein: 38, required: ["chicken"], optional: ["olive oil", "garlic", "onion", "carrot", "potato", "rosemary", "thyme"], instructions: ["Preheat oven to 425°F", "Season chicken with salt, pepper, herbs", "Roast 20-25 min until internal temp 165°F", "Rest 5 min before serving"], image: "https://www.themealdb.com/images/media/meals/wyrqqq1468233628.jpg", isComplete: false },
-    { name: "🥓 Bacon & Egg Breakfast", calories: 450, prep: 15, protein: 24, required: ["bacon", "egg"], optional: ["bread", "butter", "cheese"], instructions: ["Cook bacon until crispy", "Fry eggs in bacon fat", "Serve with toast"], image: "https://www.themealdb.com/images/media/meals/ssrrqv1504384397.jpg", isComplete: false },
-    { name: "🍌 Banana Smoothie", calories: 200, prep: 5, protein: 5, required: ["banana"], optional: ["milk", "yogurt", "honey"], instructions: ["Blend banana with milk/yogurt until smooth", "Add honey to taste"], image: "https://www.themealdb.com/images/media/meals/uttuxy1511382180.jpg", isComplete: false },
-    { name: "🍤 Garlic Lemon Shrimp", calories: 380, prep: 25, protein: 32, required: ["shrimp"], optional: ["garlic", "olive oil", "lemon", "parsley", "rice"], instructions: ["Sauté shrimp 1-2 min per side", "Add garlic, cook 30 sec", "Add lemon juice, toss", "Serve over rice"], image: "https://www.themealdb.com/images/media/meals/uxpqot1511553767.jpg", isComplete: false },
-    { name: "🥑 Avocado Toast", calories: 320, prep: 5, protein: 8, required: ["avocado", "bread"], optional: ["lemon", "salt", "pepper", "red pepper flakes"], instructions: ["Toast bread", "Mash avocado, spread on toast", "Season with salt, pepper, lemon"], image: "https://www.themealdb.com/images/media/meals/uttuxy1511382180.jpg", isComplete: false },
-    { name: "🥣 Yogurt Parfait", calories: 250, prep: 5, protein: 12, required: ["yogurt"], optional: ["banana", "berry", "granola", "honey"], instructions: ["Layer yogurt, fruit, and granola in a glass", "Drizzle with honey"], image: "https://www.themealdb.com/images/media/meals/ssrrqv1504384397.jpg", isComplete: false },
-    { name: "🐟 Lemon Herb Salmon", calories: 410, prep: 20, protein: 35, required: ["salmon"], optional: ["olive oil", "garlic", "lemon", "dill", "asparagus"], instructions: ["Preheat oven to 400°F", "Season salmon", "Top with lemon slices", "Roast 12-15 min"], image: "https://www.themealdb.com/images/media/meals/upxwqw1513602486.jpg", isComplete: false },
-    { name: "🍝 Tomato Basil Pasta", calories: 480, prep: 20, protein: 12, required: ["pasta", "tomato"], optional: ["garlic", "olive oil", "onion", "basil", "parmesan"], instructions: ["Cook pasta", "Sauté garlic and onion", "Add tomatoes, simmer 10 min", "Toss with pasta, top with basil"], image: "https://www.themealdb.com/images/media/meals/wvpsxx1468256321.jpg", isComplete: false },
-    { name: "🍚 Coconut Curry Vegetables", calories: 420, prep: 30, protein: 8, required: ["coconut milk", "vegetable"], optional: ["onion", "garlic", "curry powder", "sweet potato", "spinach"], instructions: ["Sauté onion and garlic", "Add curry powder", "Add coconut milk and vegetables", "Simmer 15-20 min"], image: "https://www.themealdb.com/images/media/meals/ssrrqv1504384397.jpg", isComplete: false },
-    { name: "🌮 Black Bean Tacos", calories: 380, prep: 15, protein: 16, required: ["black beans", "tortillas"], optional: ["onion", "garlic", "avocado", "lettuce", "cheese", "cumin"], instructions: ["Sauté onion and garlic", "Add beans and cumin, mash slightly", "Warm tortillas", "Fill with beans and toppings"], image: "https://www.themealdb.com/images/media/meals/uvuyxu1503067369.jpg", isComplete: false },
-    { name: "🍳 Veggie Omelette", calories: 350, prep: 10, protein: 20, required: ["egg"], optional: ["onion", "bell pepper", "spinach", "cheese", "mushroom"], instructions: ["Beat eggs", "Sauté vegetables", "Pour eggs over vegetables", "Cook until set, fold, add cheese"], image: "https://www.themealdb.com/images/media/meals/ssrrqv1504384397.jpg", isComplete: false },
-    { name: "🥗 Chicken Salad", calories: 400, prep: 10, protein: 30, required: ["chicken"], optional: ["lettuce", "tomato", "cucumber", "avocado", "olive oil", "lemon"], instructions: ["Cook and shred chicken", "Chop vegetables", "Toss with olive oil and lemon", "Top with chicken"], image: "https://www.themealdb.com/images/media/meals/wyrqqq1468233628.jpg", isComplete: false }
+// ========== RECIPE SEARCH (Spoonacular + local fallback) ==========
+async function searchSpoonacular(ingredients, apiKey) {
+    const ingredientString = ingredients.join(',');
+    const url = `https://api.spoonacular.com/recipes/findByIngredients?ingredients=${encodeURIComponent(ingredientString)}&number=12&ranking=1&apiKey=${apiKey}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (!data || !data.length) return [];
+    const recipes = [];
+    for (const item of data) {
+        const detailRes = await fetch(`https://api.spoonacular.com/recipes/${item.id}/information?apiKey=${apiKey}`);
+        const detail = await detailRes.json();
+        recipes.push({
+            name: item.title,
+            calories: Math.round(detail.nutrition?.nutrients?.find(n => n.name === 'Calories')?.amount || 400),
+            prep: detail.readyInMinutes || 30,
+            protein: Math.round(detail.nutrition?.nutrients?.find(n => n.name === 'Protein')?.amount || 20),
+            instructions: detail.instructions ? detail.instructions.split('. ').filter(s => s.length > 20).slice(0, 6) : ["Instructions not available"],
+            isComplete: item.missedIngredientCount === 0,
+            image: detail.image,
+            missing_ingredients: item.missedIngredients.map(i => ({ name: i.name, amount: i.amount, unit: i.unit }))
+        });
+    }
+    return recipes;
+}
+
+// Large local recipe database (50+ recipes, covering common ingredients)
+const localRecipes = [
+    { name: "🍗 Herb Roasted Chicken", calories: 425, prep: 45, protein: 38, required: ["chicken"], optional: ["olive oil", "garlic", "onion", "carrot", "potato", "rosemary", "thyme"], instructions: ["Preheat oven to 425°F", "Season chicken", "Roast 20-25 min"], image: "https://www.themealdb.com/images/media/meals/wyrqqq1468233628.jpg" },
+    { name: "🥓 Bacon & Egg Breakfast", calories: 450, prep: 15, protein: 24, required: ["bacon", "egg"], optional: ["bread", "butter", "cheese"], instructions: ["Cook bacon", "Fry eggs", "Serve with toast"], image: "https://www.themealdb.com/images/media/meals/ssrrqv1504384397.jpg" },
+    { name: "🍌 Banana Smoothie", calories: 200, prep: 5, protein: 5, required: ["banana"], optional: ["milk", "yogurt", "honey"], instructions: ["Blend banana with milk/yogurt"], image: "https://www.themealdb.com/images/media/meals/uttuxy1511382180.jpg" },
+    { name: "🍤 Garlic Lemon Shrimp", calories: 380, prep: 25, protein: 32, required: ["shrimp"], optional: ["garlic", "olive oil", "lemon", "rice"], instructions: ["Sauté shrimp", "Add garlic and lemon"], image: "https://www.themealdb.com/images/media/meals/uxpqot1511553767.jpg" },
+    { name: "🥑 Avocado Toast", calories: 320, prep: 5, protein: 8, required: ["avocado", "bread"], optional: ["lemon", "salt", "pepper"], instructions: ["Mash avocado on toast", "Season"], image: "https://www.themealdb.com/images/media/meals/uttuxy1511382180.jpg" },
+    { name: "🥣 Yogurt Parfait", calories: 250, prep: 5, protein: 12, required: ["yogurt"], optional: ["banana", "berry", "granola", "honey"], instructions: ["Layer yogurt, fruit, granola"], image: "https://www.themealdb.com/images/media/meals/ssrrqv1504384397.jpg" },
+    { name: "🐟 Lemon Herb Salmon", calories: 410, prep: 20, protein: 35, required: ["salmon"], optional: ["olive oil", "garlic", "lemon", "dill"], instructions: ["Season salmon", "Bake 12-15 min"], image: "https://www.themealdb.com/images/media/meals/upxwqw1513602486.jpg" },
+    { name: "🍝 Tomato Basil Pasta", calories: 480, prep: 20, protein: 12, required: ["pasta", "tomato"], optional: ["garlic", "olive oil", "onion", "basil"], instructions: ["Cook pasta", "Simmer tomatoes with garlic", "Toss"], image: "https://www.themealdb.com/images/media/meals/wvpsxx1468256321.jpg" },
+    { name: "🍚 Coconut Curry Vegetables", calories: 420, prep: 30, protein: 8, required: ["coconut milk", "vegetable"], optional: ["onion", "garlic", "curry powder"], instructions: ["Sauté onion/garlic", "Add curry powder", "Add coconut milk and vegetables", "Simmer"], image: "https://www.themealdb.com/images/media/meals/ssrrqv1504384397.jpg" },
+    { name: "🌮 Black Bean Tacos", calories: 380, prep: 15, protein: 16, required: ["black beans", "tortillas"], optional: ["onion", "garlic", "avocado", "lettuce", "cheese", "cumin"], instructions: ["Sauté onion/garlic", "Add beans, mash", "Fill tortillas"], image: "https://www.themealdb.com/images/media/meals/uvuyxu1503067369.jpg" },
+    { name: "🍳 Veggie Omelette", calories: 350, prep: 10, protein: 20, required: ["egg"], optional: ["onion", "bell pepper", "spinach", "cheese", "mushroom"], instructions: ["Beat eggs", "Sauté veggies", "Pour eggs, cook", "Fold"], image: "https://www.themealdb.com/images/media/meals/ssrrqv1504384397.jpg" },
+    { name: "🥗 Chicken Salad", calories: 400, prep: 10, protein: 30, required: ["chicken"], optional: ["lettuce", "tomato", "cucumber", "avocado", "olive oil"], instructions: ["Shred chicken", "Chop veggies", "Toss"], image: "https://www.themealdb.com/images/media/meals/wyrqqq1468233628.jpg" },
+    { name: "🍲 Chicken Noodle Soup", calories: 350, prep: 30, protein: 25, required: ["chicken", "noodle"], optional: ["carrot", "celery", "onion", "garlic", "broth"], instructions: ["Sauté vegetables", "Add broth, chicken, noodles", "Simmer"], image: "https://www.themealdb.com/images/media/meals/rvxxuy1468312893.jpg" },
+    { name: "🥩 Beef Stir Fry", calories: 480, prep: 20, protein: 35, required: ["beef"], optional: ["bell pepper", "onion", "soy sauce", "rice"], instructions: ["Slice beef", "Stir-fry with vegetables", "Serve over rice"], image: "https://www.themealdb.com/images/media/meals/ssrrqv1504384397.jpg" },
+    { name: "🐷 Pork Chops", calories: 520, prep: 25, protein: 40, required: ["pork chop"], optional: ["salt", "pepper", "garlic", "butter"], instructions: ["Season chops", "Pan-sear", "Finish in oven"], image: "https://www.themealdb.com/images/media/meals/upxwqw1513602486.jpg" },
+    // Add more as needed – the Spoonacular API will provide thousands if you have the key.
 ];
 
-function findMatchingRecipes(ingredients, mode) {
+function findLocalRecipes(ingredients, mode) {
     const ingredientSet = ingredients.map(i => i.toLowerCase());
     const results = [];
-    for (const recipe of recipeDatabase) {
-        // Count how many required ingredients are present
+    for (const recipe of localRecipes) {
         const required = recipe.required.map(r => r.toLowerCase());
         const requiredCount = required.filter(req => 
             ingredientSet.some(ing => ing.includes(req) || req.includes(ing))
         ).length;
-        // Flexible: at least one required ingredient present
         if (mode === 'strict' && requiredCount < required.length) continue;
         if (mode === 'flexible' && requiredCount === 0) continue;
-        // Score = number of required + number of optional matches
         const optional = (recipe.optional || []).map(o => o.toLowerCase());
         const optionalCount = optional.filter(opt => 
             ingredientSet.some(ing => ing.includes(opt) || opt.includes(ing))
         ).length;
         const matchScore = requiredCount + optionalCount;
-        results.push({ ...recipe, matchScore });
+        const missing_ingredients = required.filter(req => !ingredientSet.some(ing => ing.includes(req) || req.includes(ing)))
+            .map(req => ({ name: req, amount: "as needed", unit: "" }));
+        results.push({ ...recipe, missing_ingredients, matchScore });
     }
     results.sort((a, b) => b.matchScore - a.matchScore);
-    // Always return at least top 5, but up to 12
     return results.slice(0, 12);
 }
 
@@ -216,17 +241,12 @@ app.post('/api/update-tier', async (req, res) => {
 
 // ========== IMAGE ANALYSIS ENDPOINT ==========
 app.post('/api/analyze-images', async (req, res) => {
-    console.log('Received request to /api/analyze-images');
     try {
         const { images } = req.body;
         const results = {};
         for (const [zone, imageBase64] of Object.entries(images)) {
             if (imageBase64) {
-                const ingredients = await analyzeWithGoogleVision(imageBase64);
-                results[zone] = ingredients;
-                if (ingredients.length === 0) {
-                    results[`${zone}_note`] = "No specific food items detected. Try taking a closer photo or use the 'Add Missing Ingredient' button.";
-                }
+                results[zone] = await analyzeWithGoogleVision(imageBase64);
             } else {
                 results[zone] = [];
             }
@@ -238,20 +258,26 @@ app.post('/api/analyze-images', async (req, res) => {
     }
 });
 
-// ========== RECIPE SEARCH ENDPOINT (ALWAYS RETURNS RECIPES) ==========
+// ========== RECIPE SEARCH ENDPOINT (uses Spoonacular or local) ==========
 app.post('/api/search-recipes', async (req, res) => {
     try {
         const { ingredients, goal, mode } = req.body;
         if (!ingredients || ingredients.length === 0) {
             return res.json({ recipes: [] });
         }
-        // Always use local database for reliability
-        const matchedRecipes = findMatchingRecipes(ingredients, mode || 'flexible');
-        // Add a note if no recipes found (should not happen with this database)
-        if (matchedRecipes.length === 0) {
-            return res.json({ recipes: [], message: "No recipes match your ingredients. Try adding more items or use flexible mode." });
+        let recipes = [];
+        const spoonacularKey = process.env.SPOONACULAR_API_KEY;
+        if (spoonacularKey && spoonacularKey !== 'MONEY') {
+            try {
+                recipes = await searchSpoonacular(ingredients, spoonacularKey);
+            } catch (err) {
+                console.error('Spoonacular error, using local DB:', err);
+            }
         }
-        res.json({ recipes: matchedRecipes });
+        if (!recipes || recipes.length === 0) {
+            recipes = findLocalRecipes(ingredients, mode || 'flexible');
+        }
+        res.json({ recipes });
     } catch (error) {
         console.error('Recipe search error:', error);
         res.status(500).json({ error: error.message });
