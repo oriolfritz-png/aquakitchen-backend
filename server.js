@@ -41,46 +41,36 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
-// ========== STRICT FOOD-ONLY FILTER WITH LOGGING ==========
+// ========== EDIBLE FOODS DATABASE ==========
 const EDIBLE_FOODS = new Set([
-    // Fruits
-    'apple', 'banana', 'orange', 'lemon', 'lime', 'grape', 'strawberry', 'blueberry', 'raspberry', 'blackberry',
+    'apple', 'banana', 'orange', 'lemon', 'lime', 'grape', 'strawberry', 'blueberry', 'raspberry',
     'cherry', 'peach', 'pear', 'plum', 'watermelon', 'cantaloupe', 'honeydew', 'mango', 'papaya', 'kiwi',
     'pineapple', 'coconut', 'avocado', 'tomato', 'olive', 'fig', 'date', 'pomegranate', 'cranberry',
-    // Vegetables
     'carrot', 'broccoli', 'cauliflower', 'cabbage', 'lettuce', 'spinach', 'kale', 'arugula', 'celery',
     'cucumber', 'zucchini', 'eggplant', 'bell pepper', 'jalapeno', 'onion', 'garlic', 'shallot', 'leek',
     'potato', 'sweet potato', 'yam', 'radish', 'beet', 'turnip', 'parsnip', 'corn', 'pea', 'green bean',
     'asparagus', 'artichoke', 'mushroom', 'okra', 'rhubarb', 'squash', 'pumpkin',
-    // Meats & Seafood
     'chicken', 'beef', 'pork', 'lamb', 'veal', 'turkey', 'duck', 'fish', 'salmon', 'tuna', 'shrimp', 'crab',
     'lobster', 'scallop', 'clam', 'oyster', 'mussel', 'tofu', 'tempeh', 'seitan', 'egg', 'bacon', 'sausage',
     'ham', 'steak', 'ground beef', 'ground turkey', 'chicken breast', 'chicken thigh', 'pork chop',
-    // Dairy
     'milk', 'cheese', 'yogurt', 'butter', 'cream', 'sour cream', 'cream cheese', 'cottage cheese', 'parmesan',
     'cheddar', 'mozzarella', 'swiss', 'ricotta', 'feta', 'goat cheese', 'almond milk', 'soy milk', 'oat milk',
-    // Grains & Starches
     'rice', 'pasta', 'noodle', 'bread', 'bagel', 'croissant', 'tortilla', 'cereal', 'oat', 'quinoa', 'barley',
     'farro', 'couscous', 'flour', 'cornmeal', 'polenta', 'spaghetti', 'macaroni', 'lasagna',
-    // Legumes & Nuts
-    'bean', 'lentil', 'chickpea', 'pea', 'soybean', 'nut', 'almond', 'walnut', 'pecan', 'cashew', 'peanut',
+    'bean', 'lentil', 'chickpea', 'soybean', 'nut', 'almond', 'walnut', 'pecan', 'cashew', 'peanut',
     'sunflower seed', 'pumpkin seed', 'sesame seed', 'flaxseed', 'chia seed',
-    // Spices & Herbs
     'salt', 'pepper', 'paprika', 'cumin', 'coriander', 'turmeric', 'ginger', 'garlic powder', 'onion powder',
     'oregano', 'basil', 'thyme', 'rosemary', 'sage', 'parsley', 'cilantro', 'dill', 'mint', 'cinnamon',
     'nutmeg', 'clove', 'cardamom', 'vanilla', 'cocoa', 'chocolate', 'bay leaf', 'red pepper flakes', 'cayenne',
     'chili powder', 'curry powder', 'garam masala', 'five spice', 'herbes de provence',
-    // Canned & Packaged
     'soup', 'broth', 'stock', 'sauce', 'ketchup', 'mustard', 'mayonnaise', 'vinegar', 'oil', 'olive oil',
     'coconut oil', 'vegetable oil', 'honey', 'maple syrup', 'jam', 'jelly', 'peanut butter', 'nutella',
-    // Frozen
     'frozen peas', 'frozen corn', 'frozen broccoli', 'frozen spinach', 'french fry', 'ice cream', 'pizza',
-    // Drinks
-    'coffee', 'tea', 'juice', 'soda', 'water', 'beer', 'wine', 'milk', 'cream', 'coconut water'
+    'coffee', 'tea', 'juice', 'soda', 'water', 'beer', 'wine'
 ]);
 
 async function analyzeWithGoogleVision(imageBase64) {
-    console.log('analyzeWithGoogleVision called with image length:', imageBase64 ? imageBase64.length : 'no image');
+    console.log('analyzeWithGoogleVision called, image length:', imageBase64 ? imageBase64.length : 0);
     const apiKey = process.env.GOOGLE_VISION_API_KEY;
     const base64Image = imageBase64.split(',')[1];
     const requestBody = {
@@ -98,53 +88,50 @@ async function analyzeWithGoogleVision(imageBase64) {
         });
         console.log('Vision API response status:', response.status);
         const data = await response.json();
-        console.log('Vision API data (full):', JSON.stringify(data, null, 2));
         if (!data.responses || !data.responses[0].labelAnnotations) {
             console.log('No label annotations found.');
             return [];
         }
         const allLabels = data.responses[0].labelAnnotations.map(label => label.description.toLowerCase());
-        console.log('All labels from Vision:', allLabels);
+        console.log('All labels:', allLabels);
         const ingredients = new Set();
         for (const label of allLabels) {
             if (EDIBLE_FOODS.has(label)) {
                 ingredients.add(label);
-                console.log(`Direct match: ${label}`);
-                continue;
-            }
-            let matched = false;
-            for (const food of EDIBLE_FOODS) {
-                if (label.includes(food)) {
-                    ingredients.add(food);
-                    console.log(`Partial match: "${label}" -> "${food}"`);
-                    matched = true;
-                    break;
+                console.log(`Matched: ${label}`);
+            } else {
+                let matched = false;
+                for (const food of EDIBLE_FOODS) {
+                    if (label.includes(food)) {
+                        ingredients.add(food);
+                        console.log(`Partial match: "${label}" -> "${food}"`);
+                        matched = true;
+                        break;
+                    }
                 }
-            }
-            if (!matched) {
-                console.log(`Ignored: ${label}`);
+                if (!matched) console.log(`Ignored: ${label}`);
             }
         }
         const result = [...ingredients];
         console.log('Final ingredients:', result);
         return result;
     } catch (error) {
-        console.error('Vision API fetch error details:', error);
+        console.error('Vision API error:', error);
         return [];
     }
 }
 
 // ========== RECIPE DATABASE ==========
 const recipeDatabase = [
-    { name: "🍗 Herb Roasted Chicken", calories: 425, prep: 45, protein: 38, required: ["chicken", "olive oil", "garlic", "onion"], optional: ["carrot", "potato", "rosemary", "thyme"], instructions: ["Preheat oven to 425°F", "Season chicken with salt, pepper, herbs", "Toss vegetables with oil and garlic", "Roast 20-25 min until chicken reaches 165°F", "Rest 5 min before serving"], image: "https://www.themealdb.com/images/media/meals/wyrqqq1468233628.jpg", isComplete: true },
-    { name: "🍤 Garlic Lemon Shrimp", calories: 380, prep: 25, protein: 32, required: ["shrimp", "garlic", "olive oil", "lemon"], optional: ["parsley", "rice", "butter"], instructions: ["Pat shrimp dry, season with salt", "Heat oil in skillet", "Sauté shrimp 1-2 min per side, remove", "Add garlic, cook 30 sec", "Add lemon juice and zest, return shrimp", "Garnish with parsley, serve over rice"], image: "https://www.themealdb.com/images/media/meals/uxpqot1511553767.jpg", isComplete: true },
-    { name: "🥑 Creamy Avocado Pasta", calories: 520, prep: 20, protein: 14, required: ["pasta", "avocado", "garlic", "olive oil"], optional: ["lemon", "basil", "spinach", "parmesan"], instructions: ["Cook pasta, reserve ½ cup water", "Blend avocado, garlic, oil, lemon until smooth", "Toss pasta with sauce, add pasta water as needed", "Top with basil and cheese"], image: "https://www.themealdb.com/images/media/meals/uttuxy1511382180.jpg", isComplete: true },
-    { name: "🥣 Hearty Lentil Soup", calories: 320, prep: 45, protein: 18, required: ["lentils", "onion", "garlic", "carrot"], optional: ["celery", "tomato", "spinach", "thyme"], instructions: ["Sauté onion, carrot, celery 5-7 min", "Add garlic, cook 1 min", "Add lentils, tomatoes, broth", "Simmer 25-30 min until lentils tender", "Stir in spinach, season"], image: "https://www.themealdb.com/images/media/meals/rvxxuy1468312893.jpg", isComplete: true },
-    { name: "🍳 Mediterranean Breakfast Skillet", calories: 450, prep: 20, protein: 24, required: ["eggs", "onion", "olive oil"], optional: ["bell pepper", "spinach", "tomato", "feta", "potato"], instructions: ["Sauté onion and peppers 5 min", "Add spinach, cook 2 min", "Make wells, crack eggs", "Cover, cook 4-6 min", "Top with feta"], image: "https://www.themealdb.com/images/media/meals/ssrrqv1504384397.jpg", isComplete: true },
-    { name: "🌮 Spicy Black Bean Tacos", calories: 380, prep: 15, protein: 16, required: ["black beans", "onion", "garlic", "tortillas"], optional: ["avocado", "lettuce", "tomato", "cheese", "cumin"], instructions: ["Sauté onion and garlic", "Add beans, cumin, mash slightly", "Warm tortillas", "Fill tortillas, top with avocado, lettuce, cheese"], image: "https://www.themealdb.com/images/media/meals/uvuyxu1503067369.jpg", isComplete: true },
-    { name: "🐟 Lemon Herb Baked Salmon", calories: 410, prep: 20, protein: 35, required: ["salmon", "olive oil", "garlic", "lemon"], optional: ["dill", "asparagus", "broccoli"], instructions: ["Preheat oven to 400°F", "Season salmon with garlic, herbs", "Top with lemon slices", "Roast 12-15 min", "Serve with roasted vegetables"], image: "https://www.themealdb.com/images/media/meals/upxwqw1513602486.jpg", isComplete: true },
-    { name: "🍝 Quick Tomato Basil Pasta", calories: 480, prep: 20, protein: 12, required: ["pasta", "canned tomatoes", "garlic", "olive oil"], optional: ["onion", "basil", "parmesan", "red pepper flakes"], instructions: ["Cook pasta", "Sauté onion and garlic", "Add tomatoes, simmer 10 min", "Toss with pasta, top with basil"], image: "https://www.themealdb.com/images/media/meals/wvpsxx1468256321.jpg", isComplete: true },
-    { name: "🍚 Coconut Curry Vegetables", calories: 420, prep: 30, protein: 8, required: ["coconut milk", "onion", "garlic", "curry powder"], optional: ["sweet potato", "carrot", "spinach", "chickpeas"], instructions: ["Sauté onion and garlic", "Add curry powder, cook 1 min", "Add coconut milk and vegetables", "Simmer 15-20 min", "Add spinach at the end"], image: "https://www.themealdb.com/images/media/meals/ssrrqv1504384397.jpg", isComplete: true }
+    { name: "🍗 Herb Roasted Chicken", calories: 425, prep: 45, protein: 38, required: ["chicken", "olive oil", "garlic", "onion"], optional: ["carrot", "potato", "rosemary", "thyme"], instructions: ["Preheat oven to 425°F", "Season chicken", "Roast 20-25 min"], image: "https://www.themealdb.com/images/media/meals/wyrqqq1468233628.jpg", isComplete: true },
+    { name: "🍤 Garlic Lemon Shrimp", calories: 380, prep: 25, protein: 32, required: ["shrimp", "garlic", "olive oil", "lemon"], optional: ["parsley", "rice", "butter"], instructions: ["Sauté shrimp", "Add garlic and lemon"], image: "https://www.themealdb.com/images/media/meals/uxpqot1511553767.jpg", isComplete: true },
+    { name: "🥑 Creamy Avocado Pasta", calories: 520, prep: 20, protein: 14, required: ["pasta", "avocado", "garlic", "olive oil"], optional: ["lemon", "basil", "spinach", "parmesan"], instructions: ["Cook pasta", "Blend avocado, garlic, oil", "Toss"], image: "https://www.themealdb.com/images/media/meals/uttuxy1511382180.jpg", isComplete: true },
+    { name: "🥣 Hearty Lentil Soup", calories: 320, prep: 45, protein: 18, required: ["lentils", "onion", "garlic", "carrot"], optional: ["celery", "tomato", "spinach", "thyme"], instructions: ["Sauté vegetables", "Add lentils and broth", "Simmer 25-30 min"], image: "https://www.themealdb.com/images/media/meals/rvxxuy1468312893.jpg", isComplete: true },
+    { name: "🍳 Mediterranean Breakfast Skillet", calories: 450, prep: 20, protein: 24, required: ["eggs", "onion", "olive oil"], optional: ["bell pepper", "spinach", "tomato", "feta", "potato"], instructions: ["Sauté onion and peppers", "Add spinach", "Crack eggs", "Cover and cook"], image: "https://www.themealdb.com/images/media/meals/ssrrqv1504384397.jpg", isComplete: true },
+    { name: "🌮 Spicy Black Bean Tacos", calories: 380, prep: 15, protein: 16, required: ["black beans", "onion", "garlic", "tortillas"], optional: ["avocado", "lettuce", "tomato", "cheese", "cumin"], instructions: ["Sauté onion and garlic", "Add beans and cumin", "Warm tortillas", "Fill"], image: "https://www.themealdb.com/images/media/meals/uvuyxu1503067369.jpg", isComplete: true },
+    { name: "🐟 Lemon Herb Baked Salmon", calories: 410, prep: 20, protein: 35, required: ["salmon", "olive oil", "garlic", "lemon"], optional: ["dill", "asparagus", "broccoli"], instructions: ["Season salmon", "Top with lemon", "Bake 12-15 min"], image: "https://www.themealdb.com/images/media/meals/upxwqw1513602486.jpg", isComplete: true },
+    { name: "🍝 Quick Tomato Basil Pasta", calories: 480, prep: 20, protein: 12, required: ["pasta", "canned tomatoes", "garlic", "olive oil"], optional: ["onion", "basil", "parmesan", "red pepper flakes"], instructions: ["Cook pasta", "Sauté garlic", "Add tomatoes, simmer", "Toss"], image: "https://www.themealdb.com/images/media/meals/wvpsxx1468256321.jpg", isComplete: true },
+    { name: "🍚 Coconut Curry Vegetables", calories: 420, prep: 30, protein: 8, required: ["coconut milk", "onion", "garlic", "curry powder"], optional: ["sweet potato", "carrot", "spinach", "chickpeas"], instructions: ["Sauté onion and garlic", "Add curry powder", "Add coconut milk and vegetables", "Simmer"], image: "https://www.themealdb.com/images/media/meals/ssrrqv1504384397.jpg", isComplete: true }
 ];
 
 function findMatchingRecipes(ingredients, mode) {
