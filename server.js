@@ -37,32 +37,32 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
-// ========== EDIBLE FOODS DATABASE ==========
+// ========== EDIBLE FOODS DATABASE (for filtering Vision results) ==========
 const EDIBLE_FOODS = new Set([
-    'apple', 'banana', 'orange', 'lemon', 'lime', 'grape', 'strawberry', 'blueberry', 'raspberry',
-    'cherry', 'peach', 'pear', 'plum', 'watermelon', 'cantaloupe', 'honeydew', 'mango', 'papaya', 'kiwi',
-    'pineapple', 'coconut', 'avocado', 'tomato', 'olive', 'fig', 'date', 'pomegranate', 'cranberry',
-    'carrot', 'broccoli', 'cauliflower', 'cabbage', 'lettuce', 'spinach', 'kale', 'arugula', 'celery',
-    'cucumber', 'zucchini', 'eggplant', 'bell pepper', 'jalapeno', 'onion', 'garlic', 'shallot', 'leek',
-    'potato', 'sweet potato', 'yam', 'radish', 'beet', 'turnip', 'parsnip', 'corn', 'pea', 'green bean',
-    'asparagus', 'artichoke', 'mushroom', 'okra', 'rhubarb', 'squash', 'pumpkin',
-    'chicken', 'beef', 'pork', 'lamb', 'veal', 'turkey', 'duck', 'fish', 'salmon', 'tuna', 'shrimp', 'crab',
-    'lobster', 'scallop', 'clam', 'oyster', 'mussel', 'tofu', 'tempeh', 'seitan', 'egg', 'bacon', 'sausage',
-    'ham', 'steak', 'ground beef', 'ground turkey', 'chicken breast', 'chicken thigh', 'pork chop',
-    'milk', 'cheese', 'yogurt', 'butter', 'cream', 'sour cream', 'cream cheese', 'cottage cheese', 'parmesan',
-    'cheddar', 'mozzarella', 'swiss', 'ricotta', 'feta', 'goat cheese', 'almond milk', 'soy milk', 'oat milk',
-    'rice', 'pasta', 'noodle', 'bread', 'bagel', 'croissant', 'tortilla', 'cereal', 'oat', 'quinoa', 'barley',
-    'farro', 'couscous', 'flour', 'cornmeal', 'polenta', 'spaghetti', 'macaroni', 'lasagna',
-    'bean', 'lentil', 'chickpea', 'soybean', 'nut', 'almond', 'walnut', 'pecan', 'cashew', 'peanut',
-    'sunflower seed', 'pumpkin seed', 'sesame seed', 'flaxseed', 'chia seed',
-    'salt', 'pepper', 'paprika', 'cumin', 'coriander', 'turmeric', 'ginger', 'garlic powder', 'onion powder',
-    'oregano', 'basil', 'thyme', 'rosemary', 'sage', 'parsley', 'cilantro', 'dill', 'mint', 'cinnamon',
-    'nutmeg', 'clove', 'cardamom', 'vanilla', 'cocoa', 'chocolate', 'bay leaf', 'red pepper flakes', 'cayenne',
-    'chili powder', 'curry powder', 'garam masala', 'five spice', 'herbes de provence',
-    'soup', 'broth', 'stock', 'sauce', 'ketchup', 'mustard', 'mayonnaise', 'vinegar', 'oil', 'olive oil',
-    'coconut oil', 'vegetable oil', 'honey', 'maple syrup', 'jam', 'jelly', 'peanut butter', 'nutella',
-    'frozen peas', 'frozen corn', 'frozen broccoli', 'frozen spinach', 'french fry', 'ice cream', 'pizza',
-    'coffee', 'tea', 'juice', 'soda', 'water', 'beer', 'wine'
+    'apple','banana','orange','lemon','lime','grape','strawberry','blueberry','raspberry',
+    'cherry','peach','pear','plum','watermelon','cantaloupe','honeydew','mango','papaya','kiwi',
+    'pineapple','coconut','avocado','tomato','olive','fig','date','pomegranate','cranberry',
+    'carrot','broccoli','cauliflower','cabbage','lettuce','spinach','kale','arugula','celery',
+    'cucumber','zucchini','eggplant','bell pepper','jalapeno','onion','garlic','shallot','leek',
+    'potato','sweet potato','yam','radish','beet','turnip','parsnip','corn','pea','green bean',
+    'asparagus','artichoke','mushroom','okra','rhubarb','squash','pumpkin',
+    'chicken','beef','pork','lamb','veal','turkey','duck','fish','salmon','tuna','shrimp','crab',
+    'lobster','scallop','clam','oyster','mussel','tofu','tempeh','seitan','egg','bacon','sausage',
+    'ham','steak','ground beef','ground turkey','chicken breast','chicken thigh','pork chop',
+    'milk','cheese','yogurt','butter','cream','sour cream','cream cheese','cottage cheese','parmesan',
+    'cheddar','mozzarella','swiss','ricotta','feta','goat cheese','almond milk','soy milk','oat milk',
+    'rice','pasta','noodle','bread','bagel','croissant','tortilla','cereal','oat','quinoa','barley',
+    'farro','couscous','flour','cornmeal','polenta','spaghetti','macaroni','lasagna',
+    'bean','lentil','chickpea','soybean','nut','almond','walnut','pecan','cashew','peanut',
+    'sunflower seed','pumpkin seed','sesame seed','flaxseed','chia seed',
+    'salt','pepper','paprika','cumin','coriander','turmeric','ginger','garlic powder','onion powder',
+    'oregano','basil','thyme','rosemary','sage','parsley','cilantro','dill','mint','cinnamon',
+    'nutmeg','clove','cardamom','vanilla','cocoa','chocolate','bay leaf','red pepper flakes','cayenne',
+    'chili powder','curry powder','garam masala','five spice','herbes de provence',
+    'soup','broth','stock','sauce','ketchup','mustard','mayonnaise','vinegar','oil','olive oil',
+    'coconut oil','vegetable oil','honey','maple syrup','jam','jelly','peanut butter','nutella',
+    'frozen peas','frozen corn','frozen broccoli','frozen spinach','french fry','ice cream','pizza',
+    'coffee','tea','juice','soda','water','beer','wine'
 ]);
 
 async function analyzeWithGoogleVision(imageBase64) {
@@ -110,6 +110,7 @@ async function analyzeWithGoogleVision(imageBase64) {
                 for (const food of EDIBLE_FOODS) {
                     if (word.includes(food) && food.length > 2) {
                         ingredients.add(food);
+                        break;
                     }
                 }
             }
@@ -121,32 +122,39 @@ async function analyzeWithGoogleVision(imageBase64) {
     }
 }
 
-// ========== RECIPE SEARCH (Spoonacular + local fallback) ==========
-async function searchSpoonacular(ingredients, apiKey) {
+// ========== RECIPE SEARCH (Spoonacular with your key, plus local fallback) ==========
+const SPOONACULAR_API_KEY = '8a6c06a6f98442bb98ab8807fd85718e';
+
+async function searchSpoonacular(ingredients) {
     const ingredientString = ingredients.join(',');
-    const url = `https://api.spoonacular.com/recipes/findByIngredients?ingredients=${encodeURIComponent(ingredientString)}&number=12&ranking=1&apiKey=${apiKey}`;
-    const response = await fetch(url);
-    const data = await response.json();
-    if (!data || !data.length) return [];
-    const recipes = [];
-    for (const item of data) {
-        const detailRes = await fetch(`https://api.spoonacular.com/recipes/${item.id}/information?apiKey=${apiKey}`);
-        const detail = await detailRes.json();
-        recipes.push({
-            name: item.title,
-            calories: Math.round(detail.nutrition?.nutrients?.find(n => n.name === 'Calories')?.amount || 400),
-            prep: detail.readyInMinutes || 30,
-            protein: Math.round(detail.nutrition?.nutrients?.find(n => n.name === 'Protein')?.amount || 20),
-            instructions: detail.instructions ? detail.instructions.split('. ').filter(s => s.length > 20).slice(0, 6) : ["Instructions not available"],
-            isComplete: item.missedIngredientCount === 0,
-            image: detail.image,
-            missing_ingredients: item.missedIngredients.map(i => ({ name: i.name, amount: i.amount, unit: i.unit }))
-        });
+    const url = `https://api.spoonacular.com/recipes/findByIngredients?ingredients=${encodeURIComponent(ingredientString)}&number=12&ranking=1&apiKey=${SPOONACULAR_API_KEY}`;
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        if (!data || !data.length) return [];
+        const recipes = [];
+        for (const item of data) {
+            const detailRes = await fetch(`https://api.spoonacular.com/recipes/${item.id}/information?apiKey=${SPOONACULAR_API_KEY}`);
+            const detail = await detailRes.json();
+            recipes.push({
+                name: item.title,
+                calories: Math.round(detail.nutrition?.nutrients?.find(n => n.name === 'Calories')?.amount || 400),
+                prep: detail.readyInMinutes || 30,
+                protein: Math.round(detail.nutrition?.nutrients?.find(n => n.name === 'Protein')?.amount || 20),
+                instructions: detail.instructions ? detail.instructions.split('. ').filter(s => s.length > 20).slice(0, 6) : ["Instructions not available"],
+                isComplete: item.missedIngredientCount === 0,
+                image: detail.image,
+                missing_ingredients: item.missedIngredients.map(i => ({ name: i.name, amount: i.amount, unit: i.unit }))
+            });
+        }
+        return recipes;
+    } catch (err) {
+        console.error('Spoonacular error:', err);
+        return [];
     }
-    return recipes;
 }
 
-// Large local recipe database (50+ recipes, covering common ingredients)
+// Large local recipe database (fallback if Spoonacular fails)
 const localRecipes = [
     { name: "🍗 Herb Roasted Chicken", calories: 425, prep: 45, protein: 38, required: ["chicken"], optional: ["olive oil", "garlic", "onion", "carrot", "potato", "rosemary", "thyme"], instructions: ["Preheat oven to 425°F", "Season chicken", "Roast 20-25 min"], image: "https://www.themealdb.com/images/media/meals/wyrqqq1468233628.jpg" },
     { name: "🥓 Bacon & Egg Breakfast", calories: 450, prep: 15, protein: 24, required: ["bacon", "egg"], optional: ["bread", "butter", "cheese"], instructions: ["Cook bacon", "Fry eggs", "Serve with toast"], image: "https://www.themealdb.com/images/media/meals/ssrrqv1504384397.jpg" },
@@ -162,8 +170,7 @@ const localRecipes = [
     { name: "🥗 Chicken Salad", calories: 400, prep: 10, protein: 30, required: ["chicken"], optional: ["lettuce", "tomato", "cucumber", "avocado", "olive oil"], instructions: ["Shred chicken", "Chop veggies", "Toss"], image: "https://www.themealdb.com/images/media/meals/wyrqqq1468233628.jpg" },
     { name: "🍲 Chicken Noodle Soup", calories: 350, prep: 30, protein: 25, required: ["chicken", "noodle"], optional: ["carrot", "celery", "onion", "garlic", "broth"], instructions: ["Sauté vegetables", "Add broth, chicken, noodles", "Simmer"], image: "https://www.themealdb.com/images/media/meals/rvxxuy1468312893.jpg" },
     { name: "🥩 Beef Stir Fry", calories: 480, prep: 20, protein: 35, required: ["beef"], optional: ["bell pepper", "onion", "soy sauce", "rice"], instructions: ["Slice beef", "Stir-fry with vegetables", "Serve over rice"], image: "https://www.themealdb.com/images/media/meals/ssrrqv1504384397.jpg" },
-    { name: "🐷 Pork Chops", calories: 520, prep: 25, protein: 40, required: ["pork chop"], optional: ["salt", "pepper", "garlic", "butter"], instructions: ["Season chops", "Pan-sear", "Finish in oven"], image: "https://www.themealdb.com/images/media/meals/upxwqw1513602486.jpg" },
-    // Add more as needed – the Spoonacular API will provide thousands if you have the key.
+    { name: "🐷 Pork Chops", calories: 520, prep: 25, protein: 40, required: ["pork chop"], optional: ["salt", "pepper", "garlic", "butter"], instructions: ["Season chops", "Pan-sear", "Finish in oven"], image: "https://www.themealdb.com/images/media/meals/upxwqw1513602486.jpg" }
 ];
 
 function findLocalRecipes(ingredients, mode) {
@@ -258,23 +265,15 @@ app.post('/api/analyze-images', async (req, res) => {
     }
 });
 
-// ========== RECIPE SEARCH ENDPOINT (uses Spoonacular or local) ==========
+// ========== RECIPE SEARCH ENDPOINT ==========
 app.post('/api/search-recipes', async (req, res) => {
     try {
         const { ingredients, goal, mode } = req.body;
         if (!ingredients || ingredients.length === 0) {
             return res.json({ recipes: [] });
         }
-        let recipes = [];
-        const spoonacularKey = process.env.SPOONACULAR_API_KEY;
-        if (spoonacularKey && spoonacularKey !== 'MONEY') {
-            try {
-                recipes = await searchSpoonacular(ingredients, spoonacularKey);
-            } catch (err) {
-                console.error('Spoonacular error, using local DB:', err);
-            }
-        }
-        if (!recipes || recipes.length === 0) {
+        let recipes = await searchSpoonacular(ingredients);
+        if (!recipes.length) {
             recipes = findLocalRecipes(ingredients, mode || 'flexible');
         }
         res.json({ recipes });
