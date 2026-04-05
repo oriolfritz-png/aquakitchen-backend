@@ -1,4 +1,3 @@
-// Same as before, but local recipes now have full instructions and ingredient measurements
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -94,7 +93,7 @@ async function analyzeWithGoogleVision(imageBase64) {
 
 const SPOONACULAR_API_KEY = '8a6c06a6f98442bb98ab8807fd85718e';
 
-async function searchSpoonacular(ingredients) {
+async function searchSpoonacular(ingredients, category) {
     const ingredientString = ingredients.join(',');
     const url = `https://api.spoonacular.com/recipes/findByIngredients?ingredients=${encodeURIComponent(ingredientString)}&number=12&ranking=1&apiKey=${SPOONACULAR_API_KEY}`;
     try {
@@ -105,6 +104,12 @@ async function searchSpoonacular(ingredients) {
         for (const item of data) {
             const detailRes = await fetch(`https://api.spoonacular.com/recipes/${item.id}/information?apiKey=${SPOONACULAR_API_KEY}`);
             const detail = await detailRes.json();
+            let recipeCategory = 'main course';
+            const dishTypes = detail.dishTypes || [];
+            if (dishTypes.includes('dessert') || dishTypes.includes('sweet')) recipeCategory = 'dessert';
+            else if (dishTypes.includes('beverage') || dishTypes.includes('drink')) recipeCategory = 'drinks';
+            else if (dishTypes.includes('side dish')) recipeCategory = 'side dish';
+            if (category !== 'all' && recipeCategory !== category) continue;
             recipes.push({
                 name: item.title,
                 calories: Math.round(detail.nutrition?.nutrients?.find(n => n.name === 'Calories')?.amount || 400),
@@ -114,7 +119,8 @@ async function searchSpoonacular(ingredients) {
                 isComplete: item.missedIngredientCount === 0,
                 image: detail.image,
                 missing_ingredients: item.missedIngredients.map(i => ({ name: i.name, amount: i.amount, unit: i.unit })),
-                ingredients: detail.extendedIngredients ? detail.extendedIngredients.map(i => ({ name: i.name, amount: i.amount, unit: i.unit })) : []
+                ingredients: detail.extendedIngredients ? detail.extendedIngredients.map(i => ({ name: i.name, amount: i.amount, unit: i.unit })) : [],
+                category: recipeCategory
             });
         }
         return recipes;
@@ -124,27 +130,39 @@ async function searchSpoonacular(ingredients) {
     }
 }
 
-// Local recipes with FULL instructions and ingredient measurements
+// Local recipes with full instructions, measurements, and categories
 const localRecipes = [
-    { name: "🍗 Herb Roasted Chicken", calories: 425, prep: 45, protein: 38, required: ["chicken"], optional: ["olive oil", "garlic", "onion", "carrot", "potato", "rosemary", "thyme"], 
-      instructions: ["Preheat oven to 425°F (220°C).", "Pat the chicken dry with paper towels.", "Rub the chicken with 2 tbsp olive oil, 4 cloves minced garlic, 1 tbsp fresh rosemary, and 1 tbsp fresh thyme.", "Season generously with salt and pepper.", "Place the chicken on a roasting pan, surrounded by chopped carrots, potatoes, and onion.", "Roast for 20-25 minutes per pound, or until internal temperature reaches 165°F (74°C).", "Let rest for 10 minutes before carving."], 
+    { name: "🍗 Herb Roasted Chicken", calories: 425, prep: 45, protein: 38, required: ["chicken"], optional: ["olive oil", "garlic", "onion", "carrot", "potato", "rosemary", "thyme"], category: "main course",
+      instructions: ["Preheat oven to 425°F (220°C).", "Pat the chicken dry.", "Rub with 2 tbsp olive oil, 4 cloves minced garlic, 1 tbsp rosemary, 1 tbsp thyme.", "Season with salt and pepper.", "Place on roasting pan with chopped carrots, potatoes, onion.", "Roast 20-25 min per lb until internal temp 165°F (74°C).", "Rest 10 minutes before carving."],
       image: "https://www.themealdb.com/images/media/meals/wyrqqq1468233628.jpg",
       ingredients: [{ name: "chicken", amount: "1 whole (4-5 lbs)", unit: "" }, { name: "olive oil", amount: "2", unit: "tbsp" }, { name: "garlic", amount: "4", unit: "cloves" }, { name: "rosemary", amount: "1", unit: "tbsp" }, { name: "thyme", amount: "1", unit: "tbsp" }, { name: "salt", amount: "1", unit: "tsp" }, { name: "pepper", amount: "1/2", unit: "tsp" }] },
-    { name: "🥓 Bacon & Egg Breakfast", calories: 450, prep: 15, protein: 24, required: ["bacon", "egg"], optional: ["bread", "butter", "cheese"], 
-      instructions: ["In a large skillet, cook 4 slices of bacon over medium heat until crispy, about 5-7 minutes.", "Remove bacon and drain on paper towels.", "Crack 2 eggs into the skillet with the bacon fat.", "Cook to your liking (sunny-side up, over easy, etc.).", "Toast 2 slices of bread and butter them.", "Assemble: place bacon on toast, top with fried eggs, and add cheese if desired."], 
+    { name: "🥓 Bacon & Egg Breakfast", calories: 450, prep: 15, protein: 24, required: ["bacon", "egg"], optional: ["bread", "butter", "cheese"], category: "main course",
+      instructions: ["Cook 4 slices bacon in skillet until crispy (5-7 min).", "Remove bacon, drain.", "Crack 2 eggs into the bacon fat, cook to liking.", "Toast 2 slices bread, butter them.", "Assemble: bacon on toast, top with eggs, add cheese if desired."],
       image: "https://www.themealdb.com/images/media/meals/ssrrqv1504384397.jpg",
       ingredients: [{ name: "bacon", amount: "4", unit: "slices" }, { name: "egg", amount: "2", unit: "large" }, { name: "bread", amount: "2", unit: "slices" }, { name: "butter", amount: "1", unit: "tbsp" }] },
-    { name: "🍌 Banana Smoothie", calories: 200, prep: 5, protein: 5, required: ["banana"], optional: ["milk", "yogurt", "honey"], 
-      instructions: ["Peel 1 ripe banana and break into chunks.", "Add to a blender with 1 cup milk (or yogurt).", "Blend until smooth.", "Add 1 tsp honey if desired, blend again.", "Pour into a glass and serve immediately."], 
+    { name: "🍌 Banana Smoothie", calories: 200, prep: 5, protein: 5, required: ["banana"], optional: ["milk", "yogurt", "honey"], category: "drinks",
+      instructions: ["Peel 1 ripe banana, break into chunks.", "Add to blender with 1 cup milk (or yogurt).", "Blend until smooth.", "Add 1 tsp honey if desired, blend again.", "Pour into glass, serve immediately."],
       image: "https://www.themealdb.com/images/media/meals/uttuxy1511382180.jpg",
       ingredients: [{ name: "banana", amount: "1", unit: "ripe" }, { name: "milk", amount: "1", unit: "cup" }, { name: "honey", amount: "1", unit: "tsp" }] },
-    // Add more local recipes as needed – but Spoonacular will provide thousands
+    { name: "🥗 Simple Side Salad", calories: 120, prep: 5, protein: 2, required: ["lettuce"], optional: ["tomato", "cucumber", "olive oil", "vinegar"], category: "side dish",
+      instructions: ["Wash and chop lettuce.", "Slice tomato and cucumber.", "Toss in bowl.", "Drizzle with olive oil and vinegar, season with salt and pepper."],
+      image: "https://www.themealdb.com/images/media/meals/ssrrqv1504384397.jpg",
+      ingredients: [{ name: "lettuce", amount: "2", unit: "cups" }, { name: "tomato", amount: "1", unit: "medium" }, { name: "cucumber", amount: "1/2", unit: "" }, { name: "olive oil", amount: "1", unit: "tbsp" }] },
+    { name: "🍫 Chocolate Mug Cake", calories: 350, prep: 3, protein: 6, required: ["flour", "sugar", "cocoa", "egg"], optional: ["milk", "oil"], category: "dessert",
+      instructions: ["In microwave-safe mug, mix 4 tbsp flour, 3 tbsp sugar, 2 tbsp cocoa, 1 egg.", "Add 3 tbsp milk, 2 tbsp oil, stir until smooth.", "Microwave on high 90 seconds.", "Let cool slightly, enjoy."],
+      image: "https://www.themealdb.com/images/media/meals/uttuxy1511382180.jpg",
+      ingredients: [{ name: "flour", amount: "4", unit: "tbsp" }, { name: "sugar", amount: "3", unit: "tbsp" }, { name: "cocoa powder", amount: "2", unit: "tbsp" }, { name: "egg", amount: "1", unit: "" }, { name: "milk", amount: "3", unit: "tbsp" }, { name: "oil", amount: "2", unit: "tbsp" }] },
+    { name: "🍚 Rice & Beans", calories: 320, prep: 20, protein: 10, required: ["rice", "beans"], optional: ["onion", "garlic", "cumin"], category: "main course",
+      instructions: ["Cook 1 cup rice according to package.", "In pan, sauté 1/2 onion and 2 garlic cloves.", "Add 1 can beans (drained), 1/2 tsp cumin, salt.", "Simmer 5 minutes.", "Serve over rice."],
+      image: "https://www.themealdb.com/images/media/meals/uvuyxu1503067369.jpg",
+      ingredients: [{ name: "rice", amount: "1", unit: "cup" }, { name: "beans", amount: "1", unit: "can" }, { name: "onion", amount: "1/2", unit: "" }, { name: "garlic", amount: "2", unit: "cloves" }, { name: "cumin", amount: "1/2", unit: "tsp" }] }
 ];
 
-function findLocalRecipes(ingredients, mode) {
+function findLocalRecipes(ingredients, mode, category) {
     const ingredientSet = ingredients.map(i => i.toLowerCase());
     const results = [];
     for (const recipe of localRecipes) {
+        if (category !== 'all' && recipe.category !== category) continue;
         const required = recipe.required.map(r => r.toLowerCase());
         const requiredCount = required.filter(req => ingredientSet.some(ing => ing.includes(req) || req.includes(ing))).length;
         if (mode === 'strict' && requiredCount < required.length) continue;
@@ -154,13 +172,13 @@ function findLocalRecipes(ingredients, mode) {
         const matchScore = requiredCount + optionalCount;
         const missing_ingredients = required.filter(req => !ingredientSet.some(ing => ing.includes(req) || req.includes(ing)))
             .map(req => ({ name: req, amount: "as needed", unit: "" }));
-        results.push({ ...recipe, missing_ingredients, matchScore, instructions: recipe.instructions, ingredients: recipe.ingredients || [] });
+        results.push({ ...recipe, missing_ingredients, matchScore });
     }
     results.sort((a, b) => b.matchScore - a.matchScore);
     return results.slice(0, 12);
 }
 
-// AUTH ROUTES (same as before)
+// AUTH ROUTES
 app.post('/api/register', async (req, res) => {
     try {
         const { firstName, lastName, email, password, optInPromotions } = req.body;
@@ -213,10 +231,10 @@ app.post('/api/analyze-images', async (req, res) => {
 
 app.post('/api/search-recipes', async (req, res) => {
     try {
-        const { ingredients, goal, mode } = req.body;
+        const { ingredients, goal, mode, category } = req.body;
         if (!ingredients || ingredients.length === 0) return res.json({ recipes: [] });
-        let recipes = await searchSpoonacular(ingredients);
-        if (!recipes.length) recipes = findLocalRecipes(ingredients, mode || 'flexible');
+        let recipes = await searchSpoonacular(ingredients, category || 'all');
+        if (!recipes.length) recipes = findLocalRecipes(ingredients, mode || 'flexible', category || 'all');
         res.json({ recipes });
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
@@ -225,3 +243,4 @@ app.get('/', (req, res) => { res.json({ message: 'AquaKitchen API is running!' }
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`🚀 AquaKitchen API running on port ${PORT}`));
+
