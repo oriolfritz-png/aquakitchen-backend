@@ -26,7 +26,7 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
-// Full edible foods database (shortened for brevity – include your full list here)
+// ========== COMPLETE EDIBLE FOODS DATABASE ==========
 const EDIBLE_FOODS = new Set([
     'apple','banana','orange','lemon','lime','grape','strawberry','blueberry','raspberry',
     'cherry','peach','pear','plum','watermelon','cantaloupe','honeydew','mango','papaya','kiwi',
@@ -167,7 +167,7 @@ function findLocalRecipes(ingredients, mode, category, goal) {
     return results.slice(0, 12);
 }
 
-// AUTH ROUTES
+// ========== AUTH ROUTES ==========
 app.post('/api/register', async (req, res) => {
     try {
         const { firstName, lastName, email, password, optInPromotions } = req.body;
@@ -238,26 +238,23 @@ app.post('/api/search-recipes', async (req, res) => {
     }
 });
 
-// ========== GEMINI AI CHEF (FIXED MODEL NAME) ==========
+// ========== GEMINI AI CHEF – CORRECT MODEL NAMES WITH FALLBACK ==========
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 async function callGemini(prompt) {
-    try {
-        // Try with gemini-1.5-flash first
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const result = await model.generateContent(prompt);
-        return result.response.text();
-    } catch (err) {
-        console.log('Gemini flash failed, trying pro:', err.message);
+    // Try multiple model names (the correct ones for the current API)
+    const models = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-pro'];
+    for (const modelName of models) {
         try {
-            const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+            const model = genAI.getGenerativeModel({ model: modelName });
             const result = await model.generateContent(prompt);
             return result.response.text();
-        } catch (err2) {
-            console.error('Both Gemini models failed:', err2);
-            return "AI service temporarily unavailable. Please try again later.";
+        } catch (err) {
+            console.log(`Model ${modelName} failed:`, err.message);
         }
     }
+    // If all fail, return a friendly fallback
+    return "I'm sorry, the AI chef is currently unavailable. Please try again later or check your ingredients manually.";
 }
 
 app.post('/api/ai-ask', async (req, res) => {
@@ -277,4 +274,3 @@ app.get('/', (req, res) => { res.json({ message: 'AquaKitchen API is running!' }
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`🚀 AquaKitchen API running on port ${PORT}`));
-
