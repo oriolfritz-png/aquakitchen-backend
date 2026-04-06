@@ -3,6 +3,7 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 require('dotenv').config();
 
 const app = express();
@@ -110,11 +111,16 @@ async function searchSpoonacular(ingredients, category) {
             else if (dishTypes.includes('beverage') || dishTypes.includes('drink')) recipeCategory = 'drinks';
             else if (dishTypes.includes('side dish')) recipeCategory = 'side dish';
             if (category !== 'all' && recipeCategory !== category) continue;
+            const fat = Math.round(detail.nutrition?.nutrients?.find(n => n.name === 'Fat')?.amount || 0);
+            const fiber = Math.round(detail.nutrition?.nutrients?.find(n => n.name === 'Fiber')?.amount || 0);
+            const protein = Math.round(detail.nutrition?.nutrients?.find(n => n.name === 'Protein')?.amount || 0);
             recipes.push({
                 name: item.title,
                 calories: Math.round(detail.nutrition?.nutrients?.find(n => n.name === 'Calories')?.amount || 400),
                 prep: detail.readyInMinutes || 30,
-                protein: Math.round(detail.nutrition?.nutrients?.find(n => n.name === 'Protein')?.amount || 20),
+                protein,
+                fat,
+                fiber,
                 instructions: detail.instructions ? detail.instructions.split('. ').filter(s => s.length > 10) : ["Instructions not available"],
                 isComplete: item.missedIngredientCount === 0,
                 image: detail.image,
@@ -130,55 +136,38 @@ async function searchSpoonacular(ingredients, category) {
     }
 }
 
-// Local recipes with full instructions, measurements, and categories
 const localRecipes = [
-    { name: "🍗 Herb Roasted Chicken", calories: 425, prep: 45, protein: 38, required: ["chicken"], optional: ["olive oil", "garlic", "onion", "carrot", "potato", "rosemary", "thyme"], category: "main course",
+    { name: "🍗 Herb Roasted Chicken", calories: 425, prep: 45, protein: 38, fat: 18, fiber: 2, required: ["chicken"], optional: ["olive oil", "garlic", "onion", "carrot", "potato", "rosemary", "thyme"], category: "main course",
       instructions: ["Preheat oven to 425°F (220°C).", "Pat the chicken dry.", "Rub with 2 tbsp olive oil, 4 cloves minced garlic, 1 tbsp rosemary, 1 tbsp thyme.", "Season with salt and pepper.", "Place on roasting pan with chopped carrots, potatoes, onion.", "Roast 20-25 min per lb until internal temp 165°F (74°C).", "Rest 10 minutes before carving."],
       image: "https://www.themealdb.com/images/media/meals/wyrqqq1468233628.jpg",
       ingredients: [{ name: "chicken", amount: "1 whole (4-5 lbs)", unit: "" }, { name: "olive oil", amount: "2", unit: "tbsp" }, { name: "garlic", amount: "4", unit: "cloves" }, { name: "rosemary", amount: "1", unit: "tbsp" }, { name: "thyme", amount: "1", unit: "tbsp" }, { name: "salt", amount: "1", unit: "tsp" }, { name: "pepper", amount: "1/2", unit: "tsp" }] },
-    { name: "🥓 Bacon & Egg Breakfast", calories: 450, prep: 15, protein: 24, required: ["bacon", "egg"], optional: ["bread", "butter", "cheese"], category: "main course",
+    { name: "🥓 Bacon & Egg Breakfast", calories: 450, prep: 15, protein: 24, fat: 32, fiber: 1, required: ["bacon", "egg"], optional: ["bread", "butter", "cheese"], category: "main course",
       instructions: ["Cook 4 slices bacon in skillet until crispy (5-7 min).", "Remove bacon, drain.", "Crack 2 eggs into the bacon fat, cook to liking.", "Toast 2 slices bread, butter them.", "Assemble: bacon on toast, top with eggs, add cheese if desired."],
       image: "https://www.themealdb.com/images/media/meals/ssrrqv1504384397.jpg",
       ingredients: [{ name: "bacon", amount: "4", unit: "slices" }, { name: "egg", amount: "2", unit: "large" }, { name: "bread", amount: "2", unit: "slices" }, { name: "butter", amount: "1", unit: "tbsp" }] },
-    { name: "🍌 Banana Smoothie", calories: 200, prep: 5, protein: 5, required: ["banana"], optional: ["milk", "yogurt", "honey"], category: "drinks",
+    { name: "🍌 Banana Smoothie", calories: 200, prep: 5, protein: 5, fat: 1, fiber: 3, required: ["banana"], optional: ["milk", "yogurt", "honey"], category: "drinks",
       instructions: ["Peel 1 ripe banana, break into chunks.", "Add to blender with 1 cup milk (or yogurt).", "Blend until smooth.", "Add 1 tsp honey if desired, blend again.", "Pour into glass, serve immediately."],
       image: "https://www.themealdb.com/images/media/meals/uttuxy1511382180.jpg",
-      ingredients: [{ name: "banana", amount: "1", unit: "ripe" }, { name: "milk", amount: "1", unit: "cup" }, { name: "honey", amount: "1", unit: "tsp" }] },
-    { name: "🥗 Simple Side Salad", calories: 120, prep: 5, protein: 2, required: ["lettuce"], optional: ["tomato", "cucumber", "olive oil", "vinegar"], category: "side dish",
-      instructions: ["Wash and chop lettuce.", "Slice tomato and cucumber.", "Toss in bowl.", "Drizzle with olive oil and vinegar, season with salt and pepper."],
-      image: "https://www.themealdb.com/images/media/meals/ssrrqv1504384397.jpg",
-      ingredients: [{ name: "lettuce", amount: "2", unit: "cups" }, { name: "tomato", amount: "1", unit: "medium" }, { name: "cucumber", amount: "1/2", unit: "" }, { name: "olive oil", amount: "1", unit: "tbsp" }] },
-    { name: "🍫 Chocolate Mug Cake", calories: 350, prep: 3, protein: 6, required: ["flour", "sugar", "cocoa", "egg"], optional: ["milk", "oil"], category: "dessert",
-      instructions: ["In microwave-safe mug, mix 4 tbsp flour, 3 tbsp sugar, 2 tbsp cocoa, 1 egg.", "Add 3 tbsp milk, 2 tbsp oil, stir until smooth.", "Microwave on high 90 seconds.", "Let cool slightly, enjoy."],
-      image: "https://www.themealdb.com/images/media/meals/uttuxy1511382180.jpg",
-      ingredients: [{ name: "flour", amount: "4", unit: "tbsp" }, { name: "sugar", amount: "3", unit: "tbsp" }, { name: "cocoa powder", amount: "2", unit: "tbsp" }, { name: "egg", amount: "1", unit: "" }, { name: "milk", amount: "3", unit: "tbsp" }, { name: "oil", amount: "2", unit: "tbsp" }] },
-    { name: "🍚 Rice & Beans", calories: 320, prep: 20, protein: 10, required: ["rice", "beans"], optional: ["onion", "garlic", "cumin"], category: "main course",
-      instructions: ["Cook 1 cup rice according to package.", "In pan, sauté 1/2 onion and 2 garlic cloves.", "Add 1 can beans (drained), 1/2 tsp cumin, salt.", "Simmer 5 minutes.", "Serve over rice."],
-      image: "https://www.themealdb.com/images/media/meals/uvuyxu1503067369.jpg",
-      ingredients: [{ name: "rice", amount: "1", unit: "cup" }, { name: "beans", amount: "1", unit: "can" }, { name: "onion", amount: "1/2", unit: "" }, { name: "garlic", amount: "2", unit: "cloves" }, { name: "cumin", amount: "1/2", unit: "tsp" }] }
+      ingredients: [{ name: "banana", amount: "1", unit: "ripe" }, { name: "milk", amount: "1", unit: "cup" }, { name: "honey", amount: "1", unit: "tsp" }] }
 ];
 
-function findLocalRecipes(ingredients, mode, category) {
+function findLocalRecipes(ingredients, mode, category, goal) {
     const ingredientSet = ingredients.map(i => i.toLowerCase());
-    const results = [];
+    let results = [];
     for (const recipe of localRecipes) {
         if (category !== 'all' && recipe.category !== category) continue;
         const required = recipe.required.map(r => r.toLowerCase());
         const requiredCount = required.filter(req => ingredientSet.some(ing => ing.includes(req) || req.includes(ing))).length;
         if (mode === 'strict' && requiredCount < required.length) continue;
         if (mode === 'flexible' && requiredCount === 0) continue;
-        const optional = (recipe.optional || []).map(o => o.toLowerCase());
-        const optionalCount = optional.filter(opt => ingredientSet.some(ing => ing.includes(opt) || opt.includes(ing))).length;
-        const matchScore = requiredCount + optionalCount;
-        const missing_ingredients = required.filter(req => !ingredientSet.some(ing => ing.includes(req) || req.includes(ing)))
-            .map(req => ({ name: req, amount: "as needed", unit: "" }));
-        results.push({ ...recipe, missing_ingredients, matchScore });
+        let score = requiredCount;
+        if (goal === 'glp1' && recipe.protein >= 25 && recipe.fat <= 15 && recipe.fiber >= 5) score += 5;
+        results.push({ ...recipe, matchScore: score, missing_ingredients: required.filter(req => !ingredientSet.some(ing => ing.includes(req) || req.includes(ing))).map(req => ({ name: req, amount: "as needed", unit: "" })) });
     }
     results.sort((a, b) => b.matchScore - a.matchScore);
     return results.slice(0, 12);
 }
 
-// AUTH ROUTES
 app.post('/api/register', async (req, res) => {
     try {
         const { firstName, lastName, email, password, optInPromotions } = req.body;
@@ -234,13 +223,35 @@ app.post('/api/search-recipes', async (req, res) => {
         const { ingredients, goal, mode, category } = req.body;
         if (!ingredients || ingredients.length === 0) return res.json({ recipes: [] });
         let recipes = await searchSpoonacular(ingredients, category || 'all');
-        if (!recipes.length) recipes = findLocalRecipes(ingredients, mode || 'flexible', category || 'all');
-        res.json({ recipes });
+        if (recipes.length) {
+            if (goal === 'glp1') {
+                recipes = recipes.filter(r => (r.protein || 0) >= 25 && (r.fat || 0) <= 15 && (r.fiber || 0) >= 5);
+            }
+            res.json({ recipes });
+        } else {
+            const local = findLocalRecipes(ingredients, mode || 'flexible', category || 'all', goal);
+            res.json({ recipes: local });
+        }
     } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+app.post('/api/ai-ask', async (req, res) => {
+    try {
+        const { question, ingredients, goal } = req.body;
+        if (!question) return res.status(400).json({ error: 'No question provided' });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `You are a helpful AI chef. The user has ingredients: ${ingredients?.join(', ') || 'none'}. Their diet goal: ${goal || 'none'}. Answer: ${question}. Keep answer short and practical.`;
+        const result = await model.generateContent(prompt);
+        const answer = result.response.text();
+        res.json({ answer });
+    } catch (error) {
+        console.error('Gemini error:', error);
+        res.status(500).json({ error: 'AI service error' });
+    }
 });
 
 app.get('/', (req, res) => { res.json({ message: 'AquaKitchen API is running!' }); });
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`🚀 AquaKitchen API running on port ${PORT}`));
-
