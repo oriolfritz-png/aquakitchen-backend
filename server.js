@@ -26,7 +26,7 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
-// ========== COMPLETE EDIBLE FOODS DATABASE ==========
+// ========== COMPLETE EDIBLE FOODS DATABASE (shortened for brevity – include your full list) ==========
 const EDIBLE_FOODS = new Set([
     'apple','banana','orange','lemon','lime','grape','strawberry','blueberry','raspberry',
     'cherry','peach','pear','plum','watermelon','cantaloupe','honeydew','mango','papaya','kiwi',
@@ -238,19 +238,22 @@ app.post('/api/search-recipes', async (req, res) => {
     }
 });
 
-// ========== GEMINI AI CHEF – USING YOUR EXACT MODEL NAME ==========
+// ========== GEMINI AI CHEF – USING YOUR EXACT CALLGEMINI FUNCTION ==========
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Use the model name you provided: 'gemini-1.5-flash-latest'
 async function callGemini(prompt) {
     try {
-        const model = genAI.getGenerativeModel({
-            model: 'gemini-1.5-flash-latest'
-        });
+        // Check if key exists first
+        if (!process.env.GEMINI_API_KEY) {
+            console.error("Missing GEMINI_API_KEY in Environment Variables");
+            return null;
+        }
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const result = await model.generateContent(prompt);
-        return result.response.text();
+        const response = await result.response;
+        return response.text();
     } catch (err) {
-        console.error('Gemini failed:', err.message);
+        console.error('Gemini API Error details:', err.message);
         return null;
     }
 }
@@ -293,3 +296,4 @@ app.get('/', (req, res) => { res.json({ message: 'AquaKitchen API is running!' }
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`🚀 AquaKitchen API running on port ${PORT}`));
+
