@@ -26,7 +26,7 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
-// ========== EDIBLE FOODS (keep your full list – shortened here for brevity, but you have it) ==========
+// ========== COMPLETE EDIBLE FOODS DATABASE ==========
 const EDIBLE_FOODS = new Set([
     'apple','banana','orange','lemon','lime','grape','strawberry','blueberry','raspberry',
     'cherry','peach','pear','plum','watermelon','cantaloupe','honeydew','mango','papaya','kiwi',
@@ -238,28 +238,12 @@ app.post('/api/search-recipes', async (req, res) => {
     }
 });
 
-// ========== GEMINI AI CHEF WITH LOCAL FALLBACK ==========
+// ========== GEMINI AI CHEF – CORRECT MODEL NAME WITH FALLBACK ==========
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Local fallback AI – provides intelligent answers without API
-function localAIResponse(question, ingredients, goal) {
-    const q = question.toLowerCase();
-    if (q.includes('what can i make') || q.includes('recipe')) {
-        if (ingredients.length === 0) return "You haven't added any ingredients yet. Upload a photo or manually add ingredients first!";
-        return `With ${ingredients.slice(0, 3).join(', ')}${ingredients.length > 3 ? ' and others' : ''}, you could make a stir-fry, soup, omelette, or salad. Try searching for recipes using the button above!`;
-    }
-    if (q.includes('healthy') || goal === 'glp1') {
-        return "For a GLP‑1 friendly meal, focus on lean protein (chicken, fish, tofu), non-starchy vegetables, and healthy fats like avocado. Avoid fried foods, sugary drinks, and heavy sauces.";
-    }
-    if (q.includes('substitute') || q.includes('instead of')) {
-        return "Common substitutions: Greek yogurt for sour cream, applesauce for oil in baking, cauliflower for rice, and zucchini noodles for pasta. Let me know what ingredient you want to replace!";
-    }
-    return "I'm your AI chef! Ask me about recipes, substitutions, cooking times, or healthy meal ideas based on your ingredients.";
-}
-
 async function callGemini(prompt) {
-    // Try the most stable model first
-    const modelNames = ['gemini-pro', 'gemini-1.5-pro', 'gemini-1.5-flash'];
+    // Use the model name as you suggested
+    const modelNames = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
     for (const modelName of modelNames) {
         try {
             const model = genAI.getGenerativeModel({ model: modelName });
@@ -272,13 +256,29 @@ async function callGemini(prompt) {
     return null; // All models failed
 }
 
+function localAIResponse(question, ingredients, goal) {
+    const q = question.toLowerCase();
+    if (q.includes('what can i make') || q.includes('recipe')) {
+        if (ingredients.length === 0) return "You haven't added any ingredients yet. Upload a photo or manually add ingredients first!";
+        const top3 = ingredients.slice(0, 3).join(', ');
+        return `With ${top3}${ingredients.length > 3 ? ' and others' : ''}, you could make a stir-fry, soup, omelette, or salad. Click 'Search Web for Recipes' above to see specific recipes!`;
+    }
+    if (q.includes('healthy') || goal === 'glp1') {
+        return "For a GLP‑1 friendly meal, focus on lean protein (chicken, fish, tofu), non-starchy vegetables, and healthy fats like avocado. Avoid fried foods, sugary drinks, and heavy sauces.";
+    }
+    if (q.includes('substitute') || q.includes('instead of')) {
+        return "Common substitutions: Greek yogurt for sour cream, applesauce for oil in baking, cauliflower for rice, zucchini for pasta. Tell me what ingredient you want to replace!";
+    }
+    return "I'm your AI chef! Ask me about recipes, substitutions, cooking times, or healthy meal ideas based on your ingredients.";
+}
+
 app.post('/api/ai-ask', async (req, res) => {
     try {
         const { question, ingredients, goal } = req.body;
         if (!question) return res.status(400).json({ error: 'No question provided' });
         const prompt = `You are a helpful AI chef. The user has ingredients: ${ingredients?.join(', ') || 'none'}. Their diet goal: ${goal || 'none'}. Answer: ${question}. Keep answer short and practical (max 150 words).`;
         let answer = await callGemini(prompt);
-        if (!answer || answer.includes('not found') || answer.includes('unavailable')) {
+        if (!answer) {
             answer = localAIResponse(question, ingredients, goal);
         }
         res.json({ answer });
