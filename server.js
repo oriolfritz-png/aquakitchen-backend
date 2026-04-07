@@ -26,7 +26,7 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
-// ========== COMPLETE EDIBLE FOODS DATABASE (shortened for brevity – include your full list) ==========
+// ========== COMPLETE EDIBLE FOODS DATABASE ==========
 const EDIBLE_FOODS = new Set([
     'apple','banana','orange','lemon','lime','grape','strawberry','blueberry','raspberry',
     'cherry','peach','pear','plum','watermelon','cantaloupe','honeydew','mango','papaya','kiwi',
@@ -238,17 +238,17 @@ app.post('/api/search-recipes', async (req, res) => {
     }
 });
 
-// ========== GEMINI AI CHEF – USING YOUR EXACT CALLGEMINI FUNCTION ==========
+// ========== GEMINI AI CHEF – USING STABLE gemini-pro MODEL ==========
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 async function callGemini(prompt) {
     try {
-        // Check if key exists first
         if (!process.env.GEMINI_API_KEY) {
             console.error("Missing GEMINI_API_KEY in Environment Variables");
             return null;
         }
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        // Use the stable gemini-pro model
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
         const result = await model.generateContent(prompt);
         const response = await result.response;
         return response.text();
@@ -258,7 +258,6 @@ async function callGemini(prompt) {
     }
 }
 
-// Local fallback AI (never shows errors)
 function localAIResponse(question, ingredients, goal) {
     const q = question.toLowerCase();
     if (q.includes('what can i make') || q.includes('recipe')) {
@@ -292,8 +291,12 @@ app.post('/api/ai-ask', async (req, res) => {
     }
 });
 
-app.get('/', (req, res) => { res.json({ message: 'AquaKitchen API is running!' }); });
+app.get('/', (req, res) => {
+    res.json({ message: 'AquaKitchen API is running!' });
+});
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`🚀 AquaKitchen API running on port ${PORT}`));
-
+app.listen(PORT, () => {
+    console.log(`🚀 AquaKitchen API running on port ${PORT}`);
+    console.log(`Test: http://localhost:${PORT}`);
+});
