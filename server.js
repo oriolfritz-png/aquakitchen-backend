@@ -238,21 +238,24 @@ app.post('/api/search-recipes', async (req, res) => {
     }
 });
 
-// ========== GEMINI AI CHEF – USING STABLE gemini-pro MODEL ==========
+// ========== GEMINI AI CHEF – YOUR EXACT CALLGEMINI FUNCTION ==========
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 async function callGemini(prompt) {
     try {
         if (!process.env.GEMINI_API_KEY) {
-            console.error("Missing GEMINI_API_KEY in Environment Variables");
+            console.error("Missing GEMINI_API_KEY");
             return null;
         }
-        // Use the stable gemini-pro model
+
+        // We specify the model name exactly as 'gemini-1.5-flash'
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        
         const result = await model.generateContent(prompt);
         const response = await result.response;
         return response.text();
     } catch (err) {
+        // This will print the EXACT reason it's failing in your red box
         console.error('Gemini API Error details:', err.message);
         return null;
     }
