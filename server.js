@@ -26,6 +26,7 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
+// ========== COMPLETE EDIBLE FOODS DATABASE ==========
 const EDIBLE_FOODS = new Set([
     'apple','banana','orange','lemon','lime','grape','strawberry','blueberry','raspberry',
     'cherry','peach','pear','plum','watermelon','cantaloupe','honeydew','mango','papaya','kiwi',
@@ -237,7 +238,7 @@ app.post('/api/search-recipes', async (req, res) => {
     }
 });
 
-// ========== GEMINI AI CHEF WITH LISTMODELS DIAGNOSTIC (SYNTAX-SAFE) ==========
+// ========== GEMINI AI CHEF – USING gemini-1.5-flash-latest ==========
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 async function callGemini(prompt) {
@@ -247,29 +248,57 @@ async function callGemini(prompt) {
             return null;
         }
 
-        const url = "https://generativelanguage.googleapis.com/v1beta/models?key=" + process.env.GEMINI_API_KEY;
-        const debugResponse = await fetch(url);
-        const debugData = await debugResponse.json();
-        
-        console.log("=== GOOGLE SAYS THESE MODELS ARE AVAILABLE ===");
-        
-        if (debugData.models) {
-            const availableModels = debugData.models.map(function(m) { return m.name.replace("models/", ""); });
-            console.log(availableModels.join(", "));
-            
-            var firstGemini = null;
-            for (var i = 0; i < availableModels.length; i++) {
-                if (availableModels[i].indexOf("gemini") !== -1) {
-                    firstGemini = availableModels[i];
-                    break;
-                }
-            }
-            
-            if (firstGemini) {
-                console.log("Auto-selected model: " + firstGemini);
-                const model = genAI.getGenerativeModel({ model: firstGemini });
-                const result = await model.generateContent(prompt);
-                const response = await result.response;
-                return response.text();
-            } else {
-                console.error("Erro
+        // Changed model name to gemini-1.5-flash-latest
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        return response.text();
+    } catch (err) {
+        console.error('Gemini API Error details:', err.message);
+        return null;
+    }
+}
+
+function localAIResponse(question, ingredients, goal) {
+    const q = question.toLowerCase();
+    if (q.includes('what can i make') || q.includes('recipe')) {
+        if (ingredients.length === 0) return "You haven't added any ingredients yet. Upload a photo or manually add ingredients first!";
+        const top3 = ingredients.slice(0, 3).join(', ');
+        return `With ${top3}${ingredients.length > 3 ? ' and others' : ''}, you could make a stir-fry, soup, omelette, or salad. Click 'Search Web for Recipes' above to see specific recipes!`;
+    }
+    if (q.includes('healthy') || goal === 'glp1') {
+        return "For a GLP‑1 friendly meal, focus on lean protein (chicken, fish, tofu), non-starchy vegetables, and healthy fats like avocado. Avoid fried foods, sugary drinks, and heavy sauces.";
+    }
+    if (q.includes('substitute') || q.includes('instead of')) {
+        return "Common substitutions: Greek yogurt for sour cream, applesauce for oil in baking, cauliflower for rice, zucchini for pasta. Tell me what ingredient you want to replace!";
+    }
+    return "I'm your AI chef! Ask me about recipes, substitutions, cooking times, or healthy meal ideas based on your ingredients.";
+}
+
+app.post('/api/ai-ask', async (req, res) => {
+    try {
+        const { question, ingredients, goal } = req.body;
+        if (!question) return res.status(400).json({ error: 'No question provided' });
+        const prompt = `You are a helpful AI chef. The user has ingredients: ${ingredients?.join(', ') || 'none'}. Their diet goal: ${goal || 'none'}. Answer: ${question}. Keep answer short and practical (max 150 words).`;
+        let answer = await callGemini(prompt);
+        if (!answer) {
+            answer = localAIResponse(question, ingredients, goal);
+        }
+        res.json({ answer });
+    } catch (error) {
+        console.error('Gemini error:', error);
+        const fallback = localAIResponse(req.body.question, req.body.ingredients, req.body.goal);
+        res.json({ answer: fallback });
+    }
+});
+
+app.get('/', (req, res) => {
+    res.json({ message: 'AquaKitchen API is running!' });
+});
+
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+    console.log(`🚀 AquaKitchen API running on port ${PORT}`);
+    console.log(`Test: http://localhost:${PORT}`);
+});
