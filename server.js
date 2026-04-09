@@ -254,21 +254,24 @@ async function callGemini(prompt) {
         console.log("=== GOOGLE SAYS THESE MODELS ARE AVAILABLE ===");
         
         if (debugData.models) {
-            // Clean up the names (removes the "models/" part)
             const availableModels = debugData.models.map(m => m.name.replace('models/', ''));
             console.log(availableModels.join(', '));
             
-            // 2. AUTOMATICALLY FIND AND USE A GEMINI MODEL
             const firstGemini = availableModels.find(m => m.includes('gemini'));
             
             if (firstGemini) {
-                console.log(`🤖 Auto-selected model: ${firstGemini}`);
+                console.log("Auto-selected model: " + firstGemini);
                 const model = genAI.getGenerativeModel({ model: firstGemini });
                 const result = await model.generateContent(prompt);
                 return result.response.text();
             } else {
-                console.error("❌ No Gemini models found in your list!");
+                console.error("Error: No Gemini models found in your list!");
                 return null;
             }
         } else {
-            console.error("❌ API Key Er
+            console.error("API Key Error Details: ", JSON.stringify(debugData));
+            return null;
+        }
+
+    } catch (err) {
+        console.error('
