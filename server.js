@@ -237,7 +237,7 @@ app.post('/api/search-recipes', async (req, res) => {
     }
 });
 
-// ========== GEMINI AI CHEF WITH LISTMODELS DIAGNOSTIC ==========
+// ========== GEMINI AI CHEF WITH LISTMODELS DIAGNOSTIC (SYNTAX-SAFE) ==========
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 async function callGemini(prompt) {
@@ -247,31 +247,29 @@ async function callGemini(prompt) {
             return null;
         }
 
-        // 1. CALL LISTMODELS TO DIAGNOSE
-        const debugResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${process.env.GEMINI_API_KEY}`);
+        const url = "https://generativelanguage.googleapis.com/v1beta/models?key=" + process.env.GEMINI_API_KEY;
+        const debugResponse = await fetch(url);
         const debugData = await debugResponse.json();
         
         console.log("=== GOOGLE SAYS THESE MODELS ARE AVAILABLE ===");
         
         if (debugData.models) {
-            const availableModels = debugData.models.map(m => m.name.replace('models/', ''));
-            console.log(availableModels.join(', '));
+            const availableModels = debugData.models.map(function(m) { return m.name.replace("models/", ""); });
+            console.log(availableModels.join(", "));
             
-            const firstGemini = availableModels.find(m => m.includes('gemini'));
+            var firstGemini = null;
+            for (var i = 0; i < availableModels.length; i++) {
+                if (availableModels[i].indexOf("gemini") !== -1) {
+                    firstGemini = availableModels[i];
+                    break;
+                }
+            }
             
             if (firstGemini) {
                 console.log("Auto-selected model: " + firstGemini);
                 const model = genAI.getGenerativeModel({ model: firstGemini });
                 const result = await model.generateContent(prompt);
-                return result.response.text();
+                const response = await result.response;
+                return response.text();
             } else {
-                console.error("Error: No Gemini models found in your list!");
-                return null;
-            }
-        } else {
-            console.error("API Key Error Details: ", JSON.stringify(debugData));
-            return null;
-        }
-
-    } catch (err) {
-        console.error('
+                console.error("Erro
