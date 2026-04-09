@@ -249,7 +249,7 @@ async function callGemini(prompt) {
         }
 
         // Changed model name to gemini-1.5-flash-latest
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
         const result = await model.generateContent(prompt);
         const response = await result.response;
